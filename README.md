@@ -65,7 +65,14 @@ This script **uploads FHIR JSON files** to the **HAPI-FHIR server**:
    - **Bundles** → Sent to `/fhir/`
    - **Single resources** → Sent to `/fhir/{resourceType}` (e.g., `/fhir/Patient`)
 4. Logs **successful or failed uploads**.
- 
+
+###📌 **Next Steps & Extensions**
+
+🔹 Upcoming Features:
+✅ Automate bulk uploads (batch processing).
+✅ Support real patient ingestion from external FHIR-HOSE pipelines.
+✅ Enhance storage layer for analytics & machine learning.
+
 ## 📜 License
 This repository is licensed under **MIT License**. See [`LICENSE`](LICENSE) for details.
 
