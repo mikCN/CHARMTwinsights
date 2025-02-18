@@ -1,4 +1,4 @@
-# CHARMTwinsight Synthetic Data Ingestion
+# CHARMTwinsight
 
 ## 📌 Overview
 This repository provides a **data ingestion pipeline** that loads **synthetic patient data** (generated using [Synthea](https://github.com/synthetichealth/synthea)) into a **HAPI-FHIR server**. The goal is to test and validate **CHARMTwinsight's** ability to process US Core-compliant **FHIR** patient records.
