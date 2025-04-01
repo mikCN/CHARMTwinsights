@@ -1,5 +1,17 @@
 # CHARMTwinsight
 
+## WARNING
+
+This README is out of date, and this branch is in active dev & testing. Quick notes:
+
+`poetry` and recent version of `java` required
+
+- Created `Makefile`; see comments
+- Added synthea jar to repo, added synthea modules locally, moved synthea-related stuff together into `synthea` folder
+- `src` folder added (skeleton for python package, for possible later use)
+
+General workflow: `make install; make regen-patients; make hapi-up; sleep 30; make hapi-ingest-patients; make hapi-down`
+
 ## 📌 Overview
 This repository provides a **data ingestion pipeline** that loads **synthetic patient data** (generated using [Synthea](https://github.com/synthetichealth/synthea)) into a **HAPI-FHIR server**. The goal is to test and validate **CHARMTwinsight's** ability to process US Core-compliant **FHIR** patient records.
 
@@ -7,6 +19,7 @@ This repository provides a **data ingestion pipeline** that loads **synthetic pa
 - **FHIR (Fast Healthcare Interoperability Resources)** is a **standard** for exchanging healthcare data electronically.
 - **HAPI-FHIR** is an **open-source implementation** of FHIR, providing a Java-based **FHIR server** for storing and querying patient records.
 - CHARMTwinsight **ingests patient data from HAPI-FHIR**, enabling further analysis for digital twins in healthcare.
+
 
 ## 🏗 Repository Structure
 ```
