@@ -1,90 +1,97 @@
 # CHARMTwinsight
 
-## WARNING
-
-This README is out of date, and this branch is in active dev & testing. Quick notes:
-
-`poetry` and recent version of `java` required
-
-- Created `Makefile`; see comments
-- Added synthea jar to repo, added synthea modules locally, moved synthea-related stuff together into `synthea` folder
-- `src` folder added (skeleton for python package, for possible later use)
-
-General workflow: `make install; make regen-patients; make hapi-up; sleep 30; make hapi-ingest-patients; make hapi-down`
-
 ## 📌 Overview
-This repository provides a **data ingestion pipeline** that loads **synthetic patient data** (generated using [Synthea](https://github.com/synthetichealth/synthea)) into a **HAPI-FHIR server**. The goal is to test and validate **CHARMTwinsight's** ability to process US Core-compliant **FHIR** patient records.
+This repository provides a **data ingestion pipeline** that loads **synthetic patient data** (generated using [Synthea](https://github.com/synthetichealth/synthea)) into a **HAPI-FHIR server**.
+This iteration also hosts (placeholder) **data analytics** services via Python and R in a **microservices** architecture.
+# CHARMTwinsight
 
 ## 🏥 What is FHIR and HAPI-FHIR?
 - **FHIR (Fast Healthcare Interoperability Resources)** is a **standard** for exchanging healthcare data electronically.
 - **HAPI-FHIR** is an **open-source implementation** of FHIR, providing a Java-based **FHIR server** for storing and querying patient records.
-- CHARMTwinsight **ingests patient data from HAPI-FHIR**, enabling further analysis for digital twins in healthcare.
-
+- CHARMTwinsight **ingests patient data to HAPI-FHIR**, and provides an analytic framework for working with the data.
 
 ## 🏗 Repository Structure
-```
-📦 CHARMTwinsight-Synthea-Ingestion
- ┣ 📂 data/                     # Stores generated synthetic patient data
- ┃ ┣ 📂 fhir/                   # FHIR-formatted patient records
- ┃ ┣ 📂 metadata/               # Metadata from Synthea
- ┣ 📂 scripts/                  # Python scripts for data processing
- ┃ ┣ 📜 fhir_upload_script.py       # Main script to upload data to HAPI-FHIR
- ┣ 📜 README.md                 # Project documentation (this file)
-```
+
+This repo is currently organized in 2 stacks, each managed `docker-compose` in conjunction with scripts in the `scripts` folder.
+
+- The `app` directory contains the components that make up the application stack:
+  - A HAPI FHIR server, `hapi`, for ingesting and serving FHIR data
+    - The `postgres_data` subfolder is used to persistently store ingested FHIR data across server restarts etc.
+    - `scripts/hapi_*.sh` provide utilities for working with the server.
+  - A `pyserver`, which can make queries to the HAPI server, potentially do analytics, and return results via a `FastAPI` REST API.
+    - This subfolder is managed by `poetry`; working in this directory `poetry add` et al. can be used to add dependency packages, interactive (non-docker) development, etc.
+    - `scripts/pyserver_*.sh` provide utilities for working with the server.
+  - An `rserver`, which can make queries to the HAPI server, potentially do analytics, and return results via a `plumber` REST API.
+    - This is a simple R stack; dependencies should be added in the `Dockerfile`. If doing interactive (non-docker) development, you can use regular `install.packages()` et al. in your R session.
+    - `scripts/rserver_*.sh` provide utilities for working with the server.
+- The `tools` directory contains components that aren't part of the application, but useful for development, also managed by `docker-compose` for ease of development. Currently this just consists of dockerized `synthea` for generation of synthetic FHIR data.
+  - The `output` folder is meant for outputs, organized by subdirectory (e.g. `tools/output/synthea`)
+  - Other utilities in the `scripts` directory are useful here, including `docker_*.sh` (for general docker management) and `synthea_*.sh` for genererating FHIR data and pushing it to the FHIR server.
+
 
 ## ⚙️ Installation & Setup
 
-### 1️⃣ Install Dependencies
-Ensure **Python 3.8+** is installed, then install required dependencies:
-```sh
-pip install -r requirements.txt
+### 1 Install Dependencies
+
+You will need `docker` and `docker-compose`; if using a Mac install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and `docker-compose` via Homebrew.
+
+- Mac users may also wish to install GNU versions of [coreutils](https://formulae.brew.sh/formula/coreutils)
+- **Mac users may also need to enable Docker volume storage under `System Preferences -> Privacy and Security -> Files and Folders -> Docker`**
+
+### 2 Start Services
+
+You will need at least the HAPI server running; you may also want to run the `rserver` and `pyserver`:
+
+```
+scripts/hapi_start.sh
+scripts/pyserver_start.sh
+scripts/rserver_start.sh
 ```
 
-### 2️⃣ Generate Synthetic Data with Synthea
-To create **20 synthetic patients** with **US Core-compliant FHIR format**:
-```sh
-java -jar synthea-with-dependencies.jar -p 20 -a 1-90 -s 123 --exporter.fhir.use_us_core_ig true
+These scrips should handle building the required docker images etc.
+
+### 3 Generate Data
+
+You can edit the following script to modify data generation parameters (which are stored as environment variables):
+
 ```
-- `-p 20` → Generates **20 patients**.
-- `-a 1-90` → Random **ages between 1-90**.
-- `-s 123` → Uses **seed 123** for reproducibility.
-- `--exporter.fhir.use_us_core_ig true` → Ensures **US Core compliance**.
-
-Download the .jar file from [here](https://github.com/synthetichealth/synthea/releases/download/master-branch-latest/synthea-with-dependencies.jar) 
-Check output example in .zip format. (.\data)
-
-### 3️⃣ Start HAPI-FHIR Server (Docker)
-If running **HAPI-FHIR locally**, use Docker:
-```sh
-docker run -d -p 8080:8080 hapiproject/hapi:latest
-```
-Once running, access the **FHIR UI** at:
-[http://localhost:8080/](http://localhost:8080/)
-
-### 4️⃣ Upload Synthetic Data
-Run the Python script to **upload patient data** to HAPI-FHIR:
-```sh
-python scripts/fhir_upload_script.py
+scripts/synthea_gen_data.sh
 ```
 
-## 🚀 How `fhir_upload_script.py` Works
+Or you can pass those params on the command-line:
 
-This script **uploads FHIR JSON files** to the **HAPI-FHIR server**:
+```
+NUM_YEARS=2 NUM_PATIENTS=10 scripts/synthea_gen_data.sh
+```
 
-### 🔹 **Workflow**
-1. Scans the `data/fhir/` directory for **FHIR JSON files**.
-2. Identifies whether the file contains **a single resource** or **a full FHIR Bundle**.
-3. Sends data to the **appropriate HAPI-FHIR endpoint**:
-   - **Bundles** → Sent to `/fhir/`
-   - **Single resources** → Sent to `/fhir/{resourceType}` (e.g., `/fhir/Patient`)
-4. Logs **successful or failed uploads**.
+**NOTE**: For testing purposes, using more than 1 year of data slows down the ingestion into the HAPI server significantly, which is not fast for data ingest.
 
-###📌 **Next Steps & Extensions**
+**NOTE 2**: Currently generating data overwrites any previously generated data present in `tools/output/synthea`.
 
-🔹 Upcoming Features:
-✅ Automate bulk uploads (batch processing).
-✅ Support real patient ingestion from external FHIR-HOSE pipelines.
-✅ Enhance storage layer for analytics & machine learning.
+### 4 Ingest Data
+
+The HAPI server must be running (above):
+
+```
+scripts/synthea_push_hapi_data.sh
+```
+
+### 5 Try 'Analytic Services'
+
+NOTE: this part is in active development, and much tooling and analytics has not yet been created.
+
+The running `rserver` exposes `/` and `/patients` on `http://localhost:8001`, and the running `pyserver` exposes `/` and `/patients` on `http://localhost:8000`. Currently they just fetch some data from the HAPI server and serve it up via the endpoint.
+
+
+### 6 Logging and Cleaning Up
+
+- `*_logs.sh` can be used to see logs from running containers
+- `*_stop.sh` stops running containers, but does not clean out any existing stored data (e.g., ingested HAPI patient data)
+- `hapi_clean.sh` removes the stored ingested data for the HAPI server; the next `hapi_start.sh` will start with a clean slate.
+- `docker_status.sh` is a utility to see which docker containers are running on your system, and which are part of the `app` or `tools` stack.
+- `docker_clean.sh` stops and removes all running docker containers and networks. Be careful with this one if you use docker for other purposes!
+
+
 
 ## 📜 License
 This repository is licensed under **MIT License**. See [`LICENSE`](LICENSE) for details.

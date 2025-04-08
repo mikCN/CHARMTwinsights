@@ -1,0 +1,44 @@
+# note that 'ports' makes these services available to the host on hostpost:containerport
+# later we will want to keep them private via docker 'expose' and just publish specific container ports with 'ports'
+
+services:
+  pyserver:
+    build: ./pyserver
+    ports:
+      - "8000:8000"
+    depends_on:
+      - hapi
+
+  rserver:
+    build: ./rserver
+    ports:
+      - "8001:8000"
+    depends_on:
+      - hapi
+    # Run on-demand: docker-compose run rserver
+
+  hapi:
+    container_name: hapi
+    image: "hapiproject/hapi:latest"
+    ports:
+      - "8080:8080"
+    configs:
+      - source: hapi
+        target: /app/config/application.yaml
+    depends_on:
+      - hapi_db
+
+  hapi_db:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: admin
+      POSTGRES_USER: admin
+      POSTGRES_DB: hapi
+    volumes:
+      - ./hapi/postgres_data:/var/lib/postgresql/data
+
+
+configs:
+  hapi:
+    file: ./hapi/hapi.application.yaml

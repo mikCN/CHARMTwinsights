@@ -1,0 +1,18 @@
+Id,START,STOP,PATIENT,ENCOUNTER,CODE,DESCRIPTION,REASONCODE,REASONDESCRIPTION
+5ee4dd69-6baf-ba01-1daa-5323badc1db1,2012-11-18,,1e621f4c-db30-c273-49e9-2dcad508a9cb,72242ca0-e1b2-a007-f599-6a8d1281c5db,735985000,Diabetes self management plan (record artifact),714628002,Prediabetes (finding)
+b32c0a6a-a89e-9412-088d-d7286584de1e,2014-04-02,,1e621f4c-db30-c273-49e9-2dcad508a9cb,77427aa2-84a3-d3a2-dc5f-64c0a9d29036,276239002,Therapy (regime/therapy),,
+719646d0-7f89-95d1-1a95-81309cf558f9,1985-09-20,,7353e17f-0cd5-5b0a-c736-92b9ca5f8366,37f4417c-7a9e-3d0b-c80e-c36c09f19929,443402002,Lifestyle education regarding hypertension (procedure),59621000,Essential hypertension (disorder)
+67fa0a10-fa73-3617-3401-b703bb91d24a,1999-03-29,,7353e17f-0cd5-5b0a-c736-92b9ca5f8366,2aa882b9-de14-3f16-8550-328ac8bfc534,736690008,Dialysis care plan (record artifact),,
+498f8881-cb30-09e8-8ba7-3116507cf1a2,2001-01-26,,7353e17f-0cd5-5b0a-c736-92b9ca5f8366,bff022e2-39f8-af95-58e7-6fc187316f45,736285004,Hyperlipidemia clinical management plan (record artifact),55822004,Hyperlipidemia (disorder)
+ec488d95-56bc-63fa-cc94-97af0cc15e36,2002-07-05,,7353e17f-0cd5-5b0a-c736-92b9ca5f8366,dd4c3c30-6d39-1eed-f028-458b1ec0e97f,734163000,Care plan (record artifact),,
+0f54a0dd-a49f-9d86-a9fa-65eb9c03e3fc,1961-04-27,,069b5064-ff05-2225-3995-f32685518bc6,dd0ab179-6993-e9d0-6793-ff1ef6c1d192,735985000,Diabetes self management plan (record artifact),714628002,Prediabetes (finding)
+96400df5-bc55-e694-7b24-c339d77ee917,1989-02-23,,069b5064-ff05-2225-3995-f32685518bc6,dd42a018-7638-fe5c-5a18-bb9b1a8f857f,443402002,Lifestyle education regarding hypertension (procedure),59621000,Essential hypertension (disorder)
+08bb706a-da90-9093-83b0-bc0f4f842cc2,1992-01-27,,347ceebf-0248-5a56-14f3-e1e8e8ffb73c,07e84aff-9163-135e-0282-f9d08566f43c,734163000,Care plan (record artifact),,
+9be8f3f5-f92a-16f1-0dc4-6e097a6228b0,1996-05-02,,347ceebf-0248-5a56-14f3-e1e8e8ffb73c,ba9c38b1-dd87-42aa-bf7c-b7eff6169eb3,443402002,Lifestyle education regarding hypertension (procedure),59621000,Essential hypertension (disorder)
+d6ccd8f9-fbde-9464-f7b4-96fb0f77f1bd,1996-05-02,,347ceebf-0248-5a56-14f3-e1e8e8ffb73c,ba9c38b1-dd87-42aa-bf7c-b7eff6169eb3,735985000,Diabetes self management plan (record artifact),714628002,Prediabetes (finding)
+ea4caa40-2be1-646e-a832-cc451614c845,2006-07-31,,069b5064-ff05-2225-3995-f32685518bc6,64d44b3c-a42a-4fac-a3f0-af3f4d949164,736372004,Discharge care plan (record artifact),,
+91fffd7b-4f7d-8b79-ff08-42527d8c3c76,2004-12-05,,347ceebf-0248-5a56-14f3-e1e8e8ffb73c,1a3bcbd3-4698-d715-d6ad-9dd6325a0f44,736372004,Discharge care plan (record artifact),,
+0045dcbe-71a2-0900-c3f1-f3a0939fb59a,2019-08-15,,069b5064-ff05-2225-3995-f32685518bc6,7836c1da-5d8a-c0f9-818c-5d11b0871284,386257007,Dementia management (regime/therapy),26929004,Alzheimer's disease (disorder)
+c5f57a05-74f4-eace-57e7-2ef212fb9359,2021-06-23,,347ceebf-0248-5a56-14f3-e1e8e8ffb73c,1025685a-b433-3120-db1d-f70f84401e7b,408869004,Musculoskeletal care (regime/therapy),,
+eb9a17f4-9eeb-35b8-7499-3117f83328c6,2014-03-16,,e3f9dddf-3dc1-bb9d-7a41-e3b74ff1c6ba,8dc097c7-48d7-2371-f761-f86ae35edb5e,276239002,Therapy (regime/therapy),,
+895f2c95-7263-6884-00b5-02facafe5e5d,2014-08-08,,e3f9dddf-3dc1-bb9d-7a41-e3b74ff1c6ba,e58847a1-cf74-7447-5215-2021a1230f54,443402002,Lifestyle education regarding hypertension (procedure),59621000,Essential hypertension (disorder)
