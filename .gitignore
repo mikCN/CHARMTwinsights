@@ -19,6 +19,5 @@ Thumbs.db
 .ipynb_checkpoints
 
 # Large files and directories (e.g., Synthea-generated data)
-synthea/output
-synthea/synthea-with-dependencies.jar
+tools/output/
 app/hapi/postgres_data
