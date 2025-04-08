@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 import pandas as pd
 from fhiry.fhirsearch import Fhirsearch
 
@@ -9,7 +10,7 @@ def read_root():
     return {"message": "Hello from the pyserver!"}
 
 
-@app.get("/patients")
+@app.get("/patients", response_class=JSONResponse)
 def get_patients():
 
     # example based on https://github.com/dermatologist/fhiry
@@ -23,9 +24,12 @@ def get_patients():
 
     df = fs.search()
 
+    # log some info
     print(df.info())
 
-    return df
+    # the JSON response can't handle NaN values, replace with Nones
+    df = df.where(pd.notna(df), None)
+    return df.to_dict()
 
 
 

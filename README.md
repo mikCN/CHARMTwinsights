@@ -20,10 +20,11 @@ This repo is currently organized in 2 stacks, each managed `docker-compose` in c
     - `scripts/hapi_*.sh` provide utilities for working with the server.
   - A `pyserver`, which can make queries to the HAPI server, potentially do analytics, and return results via a `FastAPI` REST API.
     - This subfolder is managed by `poetry`; working in this directory `poetry add` et al. can be used to add dependency packages, interactive (non-docker) development, etc.
-    - `scripts/pyserver_*.sh` provide utilities for working with the server.
+    - `scripts/pyserver_*.sh` provide utilities for working with the server; note starting will re-build and re-start if already running.
   - An `rserver`, which can make queries to the HAPI server, potentially do analytics, and return results via a `plumber` REST API.
     - This is a simple R stack; dependencies should be added in the `Dockerfile`. If doing interactive (non-docker) development, you can use regular `install.packages()` et al. in your R session.
-    - `scripts/rserver_*.sh` provide utilities for working with the server.
+    - `scripts/rserver_*.sh` provide utilities for working with the server; note starting will re-build and re-start if already running.
+    
 - The `tools` directory contains components that aren't part of the application, but useful for development, also managed by `docker-compose` for ease of development. Currently this just consists of dockerized `synthea` for generation of synthetic FHIR data.
   - The `output` folder is meant for outputs, organized by subdirectory (e.g. `tools/output/synthea`)
   - Other utilities in the `scripts` directory are useful here, including `docker_*.sh` (for general docker management) and `synthea_*.sh` for genererating FHIR data and pushing it to the FHIR server.
@@ -33,7 +34,7 @@ This repo is currently organized in 2 stacks, each managed `docker-compose` in c
 
 ### 1 Install Dependencies
 
-You will need `docker` and `docker-compose`; if using a Mac install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and `docker-compose` via Homebrew.
+You will need `docker` and `docker-compose`; if using a Mac install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and `docker-compose` via Homebrew. (TODO: as noted in the [CHARMomics](https://github.com/CHARM-BDF/charmomics) repo docker compose is not integrated with docker desktop, should be an easy swap in the scripts.)
 
 - Mac users may also wish to install GNU versions of [coreutils](https://formulae.brew.sh/formula/coreutils)
 - **Mac users may also need to enable Docker volume storage under `System Preferences -> Privacy and Security -> Files and Folders -> Docker`**

@@ -21,3 +21,4 @@ Thumbs.db
 # Large files and directories (e.g., Synthea-generated data)
 synthea/output
 synthea/synthea-with-dependencies.jar
+app/hapi/postgres_data
