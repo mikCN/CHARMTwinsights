@@ -81,8 +81,12 @@ scripts/synthea_push_hapi_data.sh
 
 NOTE: this part is in active development, and much tooling and analytics has not yet been created.
 
-The running `rserver` exposes `/` and `/patients` on `http://localhost:8001`, and the running `pyserver` exposes `/` and `/patients` on `http://localhost:8000`. Currently they just fetch some data from the HAPI server and serve it up via the endpoint.
+The running `rserver` exposes `/` and `/patients` on `http://localhost:8001`, and the running `pyserver` exposes `/` and `/patients` on `http://localhost:8000`. Currently they just fetch some data from the HAPI server and serve it up via the endpoint. For convenience:
 
+- pyserver / [http://localhost:8000/](http://localhost:8000/)
+- pyserver /patients [http://localhost:8000/patients](http://localhost:8000/patients)
+- rserver / [http://localhost:8001/](http://localhost:8001/)
+- rserver /patients [http://localhost:8001/patients](http://localhost:8001/patients)
 
 ### 6 Logging and Cleaning Up
 
