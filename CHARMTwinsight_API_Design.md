@@ -223,8 +223,8 @@ print(response.json())
 ---
 
 ## 7. Contributors
+- Michele Esposito - Maastricht University
+- Michel Dumontier - Maastricht University
+- Anas Elghafari - Maastricht University
+- Shawn O' Neill - TisLab
 
-- Michele Esposito – Lead PM / Integration
-- Shawn O. – Infrastructure & Docker
-- Anas – API architecture & cohort logic
-- Additional collaborators: TISLab, CU, CHARM-GPT team
