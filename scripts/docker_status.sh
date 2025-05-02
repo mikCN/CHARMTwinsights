@@ -21,3 +21,6 @@ docker-compose -f "$TOOLS_COMPOSE_FILE" ps -a
 
 echo -e "\n\nALL CONTAINERS:"
 docker ps -a
+
+echo -e "\n\nDOCKER NETWORKS:"
+docker network ls
