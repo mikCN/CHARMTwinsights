@@ -38,6 +38,10 @@ services:
     volumes:
       - ./hapi/postgres_data:/var/lib/postgresql/data
 
+  synthea_server:
+    build: ./synthea_server
+    ports:
+      - "8002:8000"
 
 configs:
   hapi:
