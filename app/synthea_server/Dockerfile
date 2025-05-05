@@ -1,7 +1,6 @@
 # Use an official lightweight Python image.
-FROM python:3.13-slim
+FROM ubuntu:24.10
 
-# Install system dependencies, including libmagic.
 RUN apt-get update && apt-get install -y \
     curl \
     build-essential \
@@ -9,20 +8,26 @@ RUN apt-get update && apt-get install -y \
     file \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry.
+RUN apt-get update && apt-get install -y \
+    python3.13 \
+    python3.13-dev \
+    python3.13-venv \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV POETRY_VERSION=2.0.1
 RUN curl -sSL https://install.python-poetry.org | python3 - --version $POETRY_VERSION
 ENV PATH="/root/.local/bin:${PATH}"
 
-# install java
 RUN apt-get update && apt-get install -y \
-    openjdk-17-jre \
+    openjdk-21-jdk \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # Download the Synthea jar file and copy required modules folder
-RUN curl -L -o synthea-with-dependencies.jar https://github.com/synthetichealth/synthea/releases/download/master-branch-latest/synthea-with-dependencies.jar
+#RUN curl -L -o synthea-with-dependencies.jar https://github.com/synthetichealth/synthea/releases/download/master-branch-latest/synthea-with-dependencies.jar
+RUN curl -L -o synthea-with-dependencies.jar https://github.com/synthetichealth/synthea/releases/download/v3.2.0/synthea-with-dependencies.jar
 COPY modules ./modules
 
 # Copy install dependencies first to leverage Docker cache

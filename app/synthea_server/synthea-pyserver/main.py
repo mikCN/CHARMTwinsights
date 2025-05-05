@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 import pandas as pd
 
 app = FastAPI()
@@ -43,7 +43,7 @@ def read_root():
 
 # example call: GET http://localhost:8000/synthetic-patients?num_patients=10&num_years=1&extra_args="--exporter.fhir.use_us_core_ig true"&exporter=csv
 @app.get("/synthetic-patients")
-def get_patients(num_patients: int = 10, num_years: int = 1, extra_args: str = "", exporter: str = "csv"):
+def get_patients(num_patients: int = 10, num_years: int = 1, exporter: str = "csv"):
     import os
     import subprocess
     import tempfile
@@ -60,11 +60,8 @@ def get_patients(num_patients: int = 10, num_years: int = 1, extra_args: str = "
     # check if the number of years is valid
     if num_years <= 0:
         return JSONResponse(status_code=400, content={"error": "Number of years must be greater than 0."})
-    # check if the extra args are valid
-    if not isinstance(extra_args, str):
-        return JSONResponse(status_code=400, content={"error": "Extra args must be a string."})
     
-    def run_synthea(num_patients, num_years, extra_args, exporter):
+    async def run_synthea(num_patients, num_years, exporter):
         # create a temporary directory to store the output
         temp_dir = tempfile.mkdtemp()
         # run synthea
@@ -80,7 +77,6 @@ def get_patients(num_patients: int = 10, num_years: int = 1, extra_args: str = "
             str(num_patients),
             "--exporter.years_of_history",
             str(num_years),
-            extra_args
         ]
         # if exporter == "csv":
         cmd.append("--exporter.csv.export")
@@ -110,28 +106,29 @@ def get_patients(num_patients: int = 10, num_years: int = 1, extra_args: str = "
     # run the synthea command in a separate thread so it doesn't block the main thread and we can enforce the timeout
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    try:
-        result = loop.run_until_complete(asyncio.wait_for(run_synthea(num_patients, num_years, extra_args, exporter), timeout=10))
-        # check if the result is an error message; indicated by a string beginning with "Error:"
-        if isinstance(result, str) and result.startswith("Error:"):
-            response =  JSONResponse(status_code=500, content={"error": result})
-        else:
-            # read the zip file and return it as a response
+    #try:
+    result = loop.run_until_complete(asyncio.wait_for(run_synthea(num_patients, num_years, exporter), timeout=10)) # getting a string error here
+    print("RESULT:", result)
+    # check if the result is an error message; indicated by a string beginning with "Error:"
+    if isinstance(result, str) and result.startswith("Error:"):
+        response =  JSONResponse(status_code=500, content={"error": result})
+    else:
+    # read the zip file and return it as a response
+        def iterfile():
             with open(result, 'rb') as f:
-                zip_data = f.read()
-            response = JSONResponse(content=zip_data)
-            response.headers['Content-Disposition'] = 'attachment; filename="synthea_output.zip"'
-            response.headers['Content-Type'] = 'application/zip'
-            response.headers['Content-Length'] = str(len(zip_data))
-            # delete the temporary directory
-            shutil.rmtree(os.path.dirname(result))
-        return response
-    except subprocess.CalledProcessError as e:
-        return JSONResponse(status_code=500, content={"error": f"Error running synthea: {e}"})
-    except asyncio.TimeoutError:
-        return JSONResponse(status_code=500, content={"error": "Error: Synthea took too long to run."})
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": f"Error: {e}"})
+                yield from f
+
+        response = StreamingResponse(iterfile(), media_type="application/zip")
+        response.headers['Content-Disposition'] = 'attachment; filename="synthea_output.zip"'
+        # delete the temporary directory
+        shutil.rmtree(os.path.dirname(result))
+    return response
+    # except subprocess.CalledProcessError as e:
+    #     return JSONResponse(status_code=500, content={"error": f"Error running synthea: {e}"})
+    # except asyncio.TimeoutError:
+    #     return JSONResponse(status_code=500, content={"error": "Error: Synthea took too long to run."})
+    # except Exception as e:
+    #     return JSONResponse(status_code=500, content={"error": f"Error: {e}"})
 
 
 if __name__ == "__main__":
