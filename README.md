@@ -1,5 +1,15 @@
 # CHARMTwinsight
 
+NOTE: This is a testing branch, attempting to integrate synthea as an API-available part of the main application. This version
+does so by running a Python FastAPI service calling out to the java application as a subprocess passing some parameters, returning
+a .zip file with contents. There are currently two issues:
+
+1) it is not fully working - something about the return of the .zip file (potentially related to the async-enforced time limit?)
+2) it is really slow, requiring a full spin-up of synthea + modules for each generation
+
+Another branch is investigating (even less successfully) the service solution at https://github.com/robcaruso/dhp-synthea-service
+
+
 ## 📌 Overview
 This repository provides a **data ingestion pipeline** that loads **synthetic patient data** (generated using [Synthea](https://github.com/synthetichealth/synthea)) into a **HAPI-FHIR server**.
 This iteration also hosts (placeholder) **data analytics** services via Python and R in a **microservices** architecture.
