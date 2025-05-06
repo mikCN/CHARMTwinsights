@@ -1,5 +1,9 @@
 # CHARMTwinsight
 
+BRANCH NOTE: this branch is attempting to integrate parts of the OHDSI toolstack, specifically ATLAS and its dependencies (web-api server and postgres db).
+
+Thus far the postgres db dependency is added.
+
 ## 📌 Overview
 This repository provides a **data ingestion pipeline** that loads **synthetic patient data** (generated using [Synthea](https://github.com/synthetichealth/synthea)) into a **HAPI-FHIR server**.
 This iteration also hosts (placeholder) **data analytics** services via Python and R in a **microservices** architecture.
