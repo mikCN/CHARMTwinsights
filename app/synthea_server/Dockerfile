@@ -1,3 +1,19 @@
+FROM synthetichealth/synthea:latest
+
+# Create a volume specifically for the modules
+VOLUME /app/modules
+
+# Make sure modules are readable by other containers/services
+RUN chmod -R 755 /app/modules
+
+# Expose modules directory via a standardized path
+RUN mkdir -p /shared && ln -s /app/modules /shared/modules
+
+# Your other Dockerfile instructions
+WORKDIR /app
+
+
+
 # Use an official lightweight Python image.
 FROM ubuntu:24.10
 

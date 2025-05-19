@@ -8,6 +8,9 @@ services:
       - "8000:8000"
     depends_on:
       - hapi
+    volumes:
+      - shared_synthea_data:/synthea/data
+      - shared_synthea_modules:/synthea/modules
 
   rserver:
     build: ./rserver
@@ -42,7 +45,15 @@ services:
     build: ./synthea_server
     ports:
       - "8002:8000"
-
+    volumes:
+      - ./output:/app/output
+      - ./config:/app/config
+      - shared_synthea_data:/app
+      - shared_synthea_modules:/app/modules
 configs:
   hapi:
     file: ./hapi/hapi.application.yaml
+
+volumes:
+  shared_synthea_data:
+  shared_synthea_modules:
