@@ -1,0 +1,66 @@
+
+
+
+outcome: # defining a column spec for the table that will be analyzed
+  col_name: copd
+  indicators:
+    - domain: condition_occurrence
+      concepts_include:
+        - 255573 # and descendents, standards
+      concepts_exclude: 
+        - 4110056 # and desc
+        - 4046986 # and desc
+    - domain: procedure_occurrence
+      concepts_include:
+        - ...
+      concepts_exclude:
+        - ...
+        - ...
+      
+    
+features:
+  - col_name: obesity
+    domain: condition_occurence
+    type: binary
+    indicators:
+      ...
+  - col_name: smoking_status
+    type: binary
+    indicators:
+      - ...
+  - col_name: year_of_birth
+    type: continuous
+    table: person
+    col: year_of_birth
+  - col_name: age
+    type: continuous
+    expression: person.year_of_birth - max(condition_occurrence.condition_start)
+  - col_name: weight_category
+    type: binned
+    bins:
+      "0-10": 0-10
+      "11-20": 11-20
+      ...
+  - col_name: bmi
+    domain: measurement
+    type: continuous
+    selectors:
+      - 18513498 # id for BMI measurement
+    value: values_as_number
+  
+  - col_name: pos_covid_test
+    domain: measurement
+    type: binary
+    selectors:
+      - 135135
+      - 135315
+      - 135135
+    indicators: # found in value_as_concept_id
+      - 1398098 # positive (and descendents)
+      - 135915  # indicated (and desc...)
+
+model: 
+  formula: "copd ~ obesity + smoking_status + year_of_birth + year_of_birth : sex"
+  pre_history_required: 365
+  feature_history: 180
+  post_history_required: 60
