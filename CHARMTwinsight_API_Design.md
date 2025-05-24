@@ -1,4 +1,4 @@
-
+[
 # CHARMTwinsight – Predictive Analytics API Design Document
 
 **Deliverable:** C3.Y1.D1.5-D  
@@ -15,7 +15,7 @@ This API is designed to serve as the primary interface to query, analyze, and ma
 
 It will support:
 
-- Synthetic data generation
+- Synthetic patients data generation (by condition, by an age range, etc.)
 - Cohort management
 - Longitudinal patient views
 - Model execution and result serving
@@ -228,3 +228,4 @@ print(response.json())
 - Anas Elghafari - Maastricht University
 - Shawn O' Neill - TisLab
 
+](http://charm-twinsight.org)
