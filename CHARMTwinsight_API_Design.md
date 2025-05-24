@@ -1,4 +1,3 @@
-[
 # CHARMTwinsight – Predictive Analytics API Design Document
 
 **Deliverable:** C3.Y1.D1.5-D  
@@ -26,9 +25,10 @@ It will support:
 
 The API is deployed as part of a modular Dockerized system, and interfaces with:
 
-- **HAPI-FHIR Server** for EHR data ingestion and queries
+- **HAPI-FHIR Server** to serve as repository for EHR data ingestion and queries
 - **PostgreSQL Database** as backend storage
 - **Python and R Analytics Containers**
+- **Repository for predictive models (e.g. ML Flow models)**
 - **Planned Imputation and OMOP Mapping Services**
 - **External UI or CLI clients**
 
@@ -38,13 +38,18 @@ The API is deployed as part of a modular Dockerized system, and interfaces with:
 
 ### 3.1 Synthetic Data Generation
 
-**Endpoint:** `POST /api/synthetic/generate-patients`
+**Endpoints:** 
+`POST /api/synthetic/generate-patients`
+`GET /api/synthetic/synthea-modules`
+`GET /api/synthetic/synthea-module/{module_name}`
+
 
 **Python Example:**
 
 ```python
 import requests
 url = f"{BASE_URL}/api/synthetic/generate-patients"
+method = {"SYNTHEA"} # "SYNTHEA" or "GAN"
 payload = {
   "count": 100,
   "demographics": {
@@ -77,6 +82,10 @@ print(response.json())
 }
 ```
 
+### 3.1 Synthetic Data Generation
+
+**Endpoint:** `POST /api/synthetic/generate-patients`
+
 ---
 
 ### 3.2 Cohort Management
@@ -100,7 +109,8 @@ print(response.json())
 
 ```json
 [
-  {"cohortId": "cohort-1234", "name": "Diabetes Patients Over 50", "size": 42}
+  {"cohortId": "cohort-1234", "name": "Diabetes Patients Over 50", "size": 42},
+  {"cohortId": "cohort-54", "name": "General population, 20 to 65", "size": 2000},
 ]
 ```
 
@@ -114,6 +124,7 @@ print(response.json())
 - `GET /api/statistics/cohort/{id}/demographics`
 - `GET /api/statistics/cohort/{id}/conditions`
 - `GET /api/statistics/cohort/{id}/medications`
+- `GET /api/statistics/cohort/{id}/comorbidities`
 - `POST /api/statistics/cohort/{id}/custom-metric`
 
 **Python Example (Summary):**
@@ -169,6 +180,7 @@ print(response.json())
 **Endpoints:**
 
 - `POST /api/models/upload`
+- `GET /api/models/all`
 - `GET /api/models/{id}`
 - `DELETE /api/models/{id}`
 - `POST /api/models/{id}/predict/patient/{pid}`
