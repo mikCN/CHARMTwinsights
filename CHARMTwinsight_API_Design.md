@@ -29,6 +29,7 @@ The API is deployed as part of a modular Dockerized system, and interfaces with:
 - **PostgreSQL Database** as backend storage
 - **Python and R Analytics Containers**
 - **Repository for predictive models (e.g. ML Flow models)**
+- **MinIO Database** or other S3-compatible object storage for models
 - **Planned Imputation and OMOP Mapping Services**
 - **External UI or CLI clients**
 
@@ -38,10 +39,14 @@ The API is deployed as part of a modular Dockerized system, and interfaces with:
 
 ### 3.1 Synthetic Data Generation
 
+Synthetic data generation can be accomplished by multiple methods, including
+the Synthea cohort builder and GAN-based generative models. Generated
+data are stored in the HAPI-fhir server for further use and reference.
+
 **Endpoints:** 
 `POST /api/synthetic/generate-patients`
-`GET /api/synthetic/synthea-modules`
-`GET /api/synthetic/synthea-module/{module_name}`
+`GET /api/synthetic/synthea-modules` # get list of modules available to synthea
+`GET /api/synthetic/synthea-module/{module_name}` # get specific module information
 
 
 **Python Example:**
@@ -82,13 +87,12 @@ print(response.json())
 }
 ```
 
-### 3.1 Synthetic Data Generation
-
-**Endpoint:** `POST /api/synthetic/generate-patients`
-
 ---
 
 ### 3.2 Cohort Management
+
+Generated synthetic cohorts may be listed, removed, and merged, 
+allowing high-level data organization.
 
 **Endpoints:**
 
@@ -117,6 +121,8 @@ print(response.json())
 ---
 
 ### 3.3 Statistics
+
+Basic summary statistics support cursory views of synthetic cohorts. 
 
 **Endpoints:**
 
@@ -149,6 +155,9 @@ print(response.json())
 
 ### 3.4 Longitudinal Patient Views
 
+Longitudinal patient views of synthetic patients and cohorts provide 
+detailed views, of use for model training or other CHARM components.
+
 **Endpoints:**
 
 - `GET /api/longitudinal/patients/{id}/timeline`
@@ -177,20 +186,26 @@ print(response.json())
 
 ### 3.5 Model Storage and Execution
 
+CHARMTwinsight will serve predictive models via REST, allowing uploads of 
+packaged ML and statistical models. An abstracted API
+with consistent metadata requirements will allow models to define their own 
+feature inputs and outputs, which may include POSTed data or CHARMTwinsight 
+cohorts or patients via reference identifier. These models may be developed
+or used by the broader CHARM ecosystem.
+
 **Endpoints:**
 
 - `POST /api/models/upload`
 - `GET /api/models/all`
-- `GET /api/models/{id}`
+- `GET /api/models/{id}` # get metadata for model usage
 - `DELETE /api/models/{id}`
-- `POST /api/models/{id}/predict/patient/{pid}`
-- `POST /api/models/{id}/predict/cohort/{cid}`
+- `POST /api/models/predict`
 
 **Python Example (Single Patient Prediction):**
 
 ```python
-url = f"{BASE_URL}/api/models/model-abc123/predict/patient/patient-001"
-payload = {"patientId": "patient-001"}
+url = f"{BASE_URL}/api/models/sepsis_model/predict"
+payload = {"data": [{"pt_age": 26, "pt_bmi": 31, "pt_copd": True, "pt_heartrate": 86}]}
 response = requests.post(url, json=payload)
 print(response.json())
 ```
@@ -199,8 +214,7 @@ print(response.json())
 
 ```json
 {
-  "patientId": "patient-001",
-  "modelId": "model-abc123",
+  "modelId": "sepsis_model",
   "predictions": {"riskScore": 0.82, "riskLevel": "High"}
 }
 ```
@@ -238,6 +252,4 @@ print(response.json())
 - Michele Esposito - Maastricht University
 - Michel Dumontier - Maastricht University
 - Anas Elghafari - Maastricht University
-- Shawn O' Neill - TisLab
-
-](http://charm-twinsight.org)
+- Shawn O'Neil - TISLab
