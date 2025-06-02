@@ -1,4 +1,3 @@
-
 # CHARMTwinsight – Predictive Analytics API Design Document
 
 **Deliverable:** C3.Y1.D1.5-D  
@@ -15,7 +14,7 @@ This API is designed to serve as the primary interface to query, analyze, and ma
 
 It will support:
 
-- Synthetic data generation
+- Synthetic patients data generation (by condition, by an age range, etc.)
 - Cohort management
 - Longitudinal patient views
 - Model execution and result serving
@@ -26,9 +25,11 @@ It will support:
 
 The API is deployed as part of a modular Dockerized system, and interfaces with:
 
-- **HAPI-FHIR Server** for EHR data ingestion and queries
+- **HAPI-FHIR Server** to serve as repository for EHR data ingestion and queries
 - **PostgreSQL Database** as backend storage
 - **Python and R Analytics Containers**
+- **Repository for predictive models (e.g. ML Flow models)**
+- **MinIO Database** or other S3-compatible object storage for models
 - **Planned Imputation and OMOP Mapping Services**
 - **External UI or CLI clients**
 
@@ -38,13 +39,22 @@ The API is deployed as part of a modular Dockerized system, and interfaces with:
 
 ### 3.1 Synthetic Data Generation
 
-**Endpoint:** `POST /api/synthetic/generate-patients`
+Synthetic data generation can be accomplished by multiple methods, including
+the Synthea cohort builder and GAN-based generative models. Generated
+data are stored in the HAPI-fhir server for further use and reference.
+
+**Endpoints:** 
+`POST /api/synthetic/generate-patients`
+`GET /api/synthetic/synthea-modules` # get list of modules available to synthea
+`GET /api/synthetic/synthea-module/{module_name}` # get specific module information
+
 
 **Python Example:**
 
 ```python
 import requests
 url = f"{BASE_URL}/api/synthetic/generate-patients"
+method = {"SYNTHEA"} # "SYNTHEA" or "GAN"
 payload = {
   "count": 100,
   "demographics": {
@@ -81,6 +91,9 @@ print(response.json())
 
 ### 3.2 Cohort Management
 
+Generated synthetic cohorts may be listed, removed, and merged, 
+allowing high-level data organization.
+
 **Endpoints:**
 
 - `GET /api/data-management/cohorts`
@@ -100,7 +113,8 @@ print(response.json())
 
 ```json
 [
-  {"cohortId": "cohort-1234", "name": "Diabetes Patients Over 50", "size": 42}
+  {"cohortId": "cohort-1234", "name": "Diabetes Patients Over 50", "size": 42},
+  {"cohortId": "cohort-54", "name": "General population, 20 to 65", "size": 2000},
 ]
 ```
 
@@ -108,12 +122,15 @@ print(response.json())
 
 ### 3.3 Statistics
 
+Basic summary statistics support cursory views of synthetic cohorts. 
+
 **Endpoints:**
 
 - `GET /api/statistics/cohort/{id}/summary`
 - `GET /api/statistics/cohort/{id}/demographics`
 - `GET /api/statistics/cohort/{id}/conditions`
 - `GET /api/statistics/cohort/{id}/medications`
+- `GET /api/statistics/cohort/{id}/comorbidities`
 - `POST /api/statistics/cohort/{id}/custom-metric`
 
 **Python Example (Summary):**
@@ -137,6 +154,9 @@ print(response.json())
 ---
 
 ### 3.4 Longitudinal Patient Views
+
+Longitudinal patient views of synthetic patients and cohorts provide 
+detailed views, of use for model training or other CHARM components.
 
 **Endpoints:**
 
@@ -166,19 +186,26 @@ print(response.json())
 
 ### 3.5 Model Storage and Execution
 
+CHARMTwinsight will serve predictive models via REST, allowing uploads of 
+packaged ML and statistical models. An abstracted API
+with consistent metadata requirements will allow models to define their own 
+feature inputs and outputs, which may include POSTed data or CHARMTwinsight 
+cohorts or patients via reference identifier. These models may be developed
+or used by the broader CHARM ecosystem.
+
 **Endpoints:**
 
 - `POST /api/models/upload`
-- `GET /api/models/{id}`
+- `GET /api/models/all`
+- `GET /api/models/{id}` # get metadata for model usage
 - `DELETE /api/models/{id}`
-- `POST /api/models/{id}/predict/patient/{pid}`
-- `POST /api/models/{id}/predict/cohort/{cid}`
+- `POST /api/models/predict`
 
 **Python Example (Single Patient Prediction):**
 
 ```python
-url = f"{BASE_URL}/api/models/model-abc123/predict/patient/patient-001"
-payload = {"patientId": "patient-001"}
+url = f"{BASE_URL}/api/models/sepsis_model/predict"
+payload = {"data": [{"pt_age": 26, "pt_bmi": 31, "pt_copd": True, "pt_heartrate": 86}]}
 response = requests.post(url, json=payload)
 print(response.json())
 ```
@@ -187,8 +214,7 @@ print(response.json())
 
 ```json
 {
-  "patientId": "patient-001",
-  "modelId": "model-abc123",
+  "modelId": "sepsis_model",
   "predictions": {"riskScore": 0.82, "riskLevel": "High"}
 }
 ```
@@ -226,5 +252,4 @@ print(response.json())
 - Michele Esposito - Maastricht University
 - Michel Dumontier - Maastricht University
 - Anas Elghafari - Maastricht University
-- Shawn O' Neill - TisLab
-
+- Shawn O'Neil - TISLab
