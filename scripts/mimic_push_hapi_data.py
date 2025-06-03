@@ -27,21 +27,22 @@ FHIR_URL = "http://localhost:8080/fhir"
 MAX_PER_PT_SAMPLE = 10
 MIN_PER_PT_SAMPLE = 2
 
-# --- Utilities ---
-def post_fhir_resource(resource, resource_type):
-    url = f"{FHIR_URL}/{resource_type}"
+def put_fhir_resource(resource, resource_type):
+    rid = resource.get("id")
+    if not rid:
+        print(f"⚠️  Resource missing ID, cannot PUT: {resource}")
+        return None
+    url = f"{FHIR_URL}/{resource_type}/{rid}"
     data = json.dumps(resource).encode("utf-8")
-    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/fhir+json"}, method="POST")
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/fhir+json"}, method="PUT")
 
     try:
         with urllib.request.urlopen(req) as response:
             return response.status
     except urllib.error.HTTPError as e:
-        if e.code == 404:
-            body = e.read().decode()
-            print(f"\n❌ HTTP 404 Not Found for {resource_type} ID {resource.get('id')}")
-            print(f"↪ Payload: {json.dumps(resource)[:300]}...")
-            print(f"↪ Response body: {body[:300]}...")
+        print(f"\n❌ HTTP Error {e.code} for {resource_type} ID {rid}")
+        print(f"↪ Payload: {json.dumps(resource)[:300]}...")
+        print(f"↪ Response body: {e.read().decode()[:300]}...")
         return e.code
     except Exception as e:
         print(f"\n❌ Error posting {resource_type}: {e}")
@@ -80,7 +81,7 @@ def process_file_all(filepath):
         resource_type = resource.get("resourceType")
         if not resource_type:
             continue
-        status = post_fhir_resource(resource, resource_type)
+        status = put_fhir_resource(resource, resource_type)
         print_progress(resource_type, i, total, status)
     print(f"\n✔ Finished: {filename}")
 
@@ -116,7 +117,7 @@ def process_file_sampled(filepath):
         resource_type = resource.get("resourceType")
         if not resource_type:
             continue
-        status = post_fhir_resource(resource, resource_type)
+        status = put_fhir_resource(resource, resource_type)
         print_progress(resource_type, i, total, status)
     print(f"\n✔ Done with: {filename}")
 
