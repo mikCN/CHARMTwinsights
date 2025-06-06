@@ -12,6 +12,12 @@ services:
       - shared_synthea_data:/synthea/data
       - shared_synthea_modules:/synthea/modules
 
+  mlflow_server:
+    build: ./mlflow_server
+    ports:
+      - "8000:8000"
+
+
   rserver:
     build: ./rserver
     ports:
