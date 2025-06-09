@@ -21,3 +21,6 @@ Thumbs.db
 # Large files and directories (e.g., Synthea-generated data)
 tools/output/
 app/hapi/postgres_data
+
+# rstudio stuff
+*.Rproj*
