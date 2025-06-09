@@ -24,3 +24,5 @@ app/hapi/postgres_data
 
 # rstudio stuff
 *.Rproj*
+
+app/mlflow_server/data

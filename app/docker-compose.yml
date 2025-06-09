@@ -12,10 +12,6 @@ services:
       - shared_synthea_data:/synthea/data
       - shared_synthea_modules:/synthea/modules
 
-  mlflow_server:
-    build: ./mlflow_server
-    ports:
-      - "8000:8000"
 
 
   rserver:
@@ -56,10 +52,44 @@ services:
       - ./config:/app/config
       - shared_synthea_data:/app
       - shared_synthea_modules:/app/modules
+
+  mlflow_server:
+    depends_on:
+      - mongo
+      - minio
+    build: ./mlflow_server
+    ports:
+      - "8003:8000"
+
+
+  mongo:
+    image: mongo:6
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./mlflow_server/data/mongo_data:/data/db
+
+  minio:
+    image: minio/minio:latest
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    ports:
+      - "9000:9000"
+      - "9001:9001"  # admin console
+    command: server /data --console-address ":9001"
+    volumes:
+      - ./mlflow_server/data/minio_data:/data
+
+
 configs:
   hapi:
     file: ./hapi/hapi.application.yaml
 
+
 volumes:
   shared_synthea_data:
   shared_synthea_modules:
+  mongo_data:
+  minio_data:
