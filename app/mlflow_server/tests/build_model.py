@@ -1,3 +1,9 @@
+# file: app/mlflow_server/tests/build_model.py
+
+## This script trains a logistic regression model on the Iris and Wine datasets,
+## saves it using MLflow, adds metadata, and packages it into a zip file.
+## We expect these 'packages' to be sent to the model serving API for deployment.
+
 import os
 import zipfile
 import shutil
@@ -54,14 +60,18 @@ def main():
     ]:
         model, X_train, X_test, name = train_model(dataset_func, model_name)
         model_dir = save_mlflow_model(model, X_train, name)
-        # Add user-editable metadata
+        # Add user-editable metadata - all required, tags can be empty
+        signature = infer_signature(X_train, model.predict(X_train))
+        signature_dict = signature.to_dict() if signature else None
         metadata = {
             "name": name,
             "author": "Shawn O'Neil",
             "description": f"A logistic regression classifier for {name.replace('_model', '')} data.",
             "version": "1.0.0",
-            "tags": [name, "sklearn", "logreg", "example"]
+            "tags": [name, "sklearn", "logreg", "example"],
+            "signature": signature_dict  # <-- required and always present
         }
+
         write_metadata(model_dir, metadata)
         archive_model(model_dir)
         # Remove the model directory after archiving
