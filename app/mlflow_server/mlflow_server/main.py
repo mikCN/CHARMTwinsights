@@ -7,8 +7,6 @@
 # The application provides endpoints to list models, get model details, and upload new models.
 
 # PLANNED FEATURES
-# Add signature information provided by mlflow to mongo db for use in GETs of model details
-# Model deletion
 # Model prediction endpoint
 
 # Model prediction will be handled by mlflow, but it is yet to be determined exactly how.
