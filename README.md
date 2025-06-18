@@ -1,13 +1,8 @@
 # CHARMTwinsight
 
-NOTE: This is a testing branch, attempting to integrate synthea as an API-available part of the main application. This version
+NOTE: This is a development branch, integrating Synthea as an API-available part of the main application. This version
 does so by running a Python FastAPI service calling out to the java application as a subprocess passing some parameters, returning
-a .zip file with contents. There are currently two issues:
-
-1) it is not fully working - something about the return of the .zip file (potentially related to the async-enforced time limit?)
-2) it is really slow, requiring a full spin-up of synthea + modules for each generation
-
-Another branch is investigating (even less successfully) the service solution at https://github.com/robcaruso/dhp-synthea-service
+a .zip file with contents.
 
 
 ## 📌 Overview
