@@ -22,6 +22,8 @@ services:
       - hapi
     # Run on-demand: docker-compose run rserver
 
+
+
   hapi:
     container_name: hapi
     image: "hapiproject/hapi:latest"
@@ -33,6 +35,8 @@ services:
     depends_on:
       - hapi_db
 
+
+
   hapi_db:
     image: postgres
     restart: always
@@ -42,6 +46,8 @@ services:
       POSTGRES_DB: hapi
     volumes:
       - ./hapi/postgres_data:/var/lib/postgresql/data
+
+
 
   synthea_server:
     build: ./synthea_server
@@ -53,13 +59,17 @@ services:
       - shared_synthea_data:/app
       - shared_synthea_modules:/app/modules
 
-  mlflow_server:
+
+
+  model_server:
     depends_on:
       - mongo
-      - minio
-    build: ./mlflow_server
+    build: ./model_server
     ports:
       - "8003:8000"
+    volumes:
+      - shared_tmp:/shared-tmp
+      - /var/run/docker.sock:/var/run/docker.sock
 
 
   mongo:
@@ -68,19 +78,7 @@ services:
     ports:
       - "27017:27017"
     volumes:
-      - ./mlflow_server/data/mongo_data:/data/db
-
-  minio:
-    image: minio/minio:latest
-    environment:
-      MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: minio123
-    ports:
-      - "9000:9000"
-      - "9001:9001"  # admin console
-    command: server /data --console-address ":9001"
-    volumes:
-      - ./mlflow_server/data/minio_data:/data
+      - mongo_data:/data/db
 
 
 configs:
@@ -91,5 +89,5 @@ configs:
 volumes:
   shared_synthea_data:
   shared_synthea_modules:
+  shared_tmp:
   mongo_data:
-  minio_data:

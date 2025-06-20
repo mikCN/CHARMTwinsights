@@ -1,0 +1,28 @@
+[project]
+name = "model_server"
+version = "0.1.0"
+description = "Model hosting for CHARMTwinsight"
+
+authors = [
+    {name = "Your Name",email = "you@example.com"}
+]
+
+license = {text = "MIT"}
+requires-python = ">=3.13,<4.0"
+
+dependencies = [
+    "fastapi (>=0.115.12,<0.116.0)",
+    "uvicorn (>=0.34.0,<0.35.0)",
+    "pymongo (>=4.13.0,<5.0.0)",
+    "docker (>=7.1.0,<8.0.0)",
+    "python-multipart (>=0.0.20,<0.0.21)",
+    "pydantic (>=2.11.7,<3.0.0)",
+]
+
+packages = [
+    { include = "model_server" }
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
