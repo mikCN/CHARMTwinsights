@@ -6,10 +6,10 @@ A compatible docker image MUST:
 - Use `/app` as the default working directory (set via `WORKDIR /app` in the Dockerfile), containing:
   - A `README.md`
   - An executable `predict`
-      - `predict` must take a single file input as its first argument, which must be a `json`-formatted *list* (to support batches of predictions)
+      - `predict` must take a single file input as its first argument, which must be a `json`-formatted *array of inputs* (i.e., it should take a batch of inputs for prediction)
   - An `examples.json`
-      - This must be a `json`-formatted list, providing an example batch of inputs
-- `predict` should succeed when running `predict examples.json` and print (on standard output) a `json`-formatted list (corresponding to the batch of predictions).
+      - This must be a `json`-formatted array, providing an example batch of inputs to send to `predict`
+- `predict` should succeed when running `predict examples.json` and print (on standard output) the `json`-formatted array of predictions.
 
 **Note**: This example includes the model building in the docker container, but not as part of the docker build. It
 is perfectly valid to train a model on an external system, export it (e.g. with `saveRDS()` in R or `mlflow` in Python as shown here), copy it into the docker image, and have `predict` load and use it.
