@@ -20,9 +20,9 @@ Thumbs.db
 
 # Large files and directories (e.g., Synthea-generated data)
 tools/output/
-app/hapi/postgres_data
+app/hapi/postgres_data/
 
 # rstudio stuff
 *.Rproj*
 
-app/mlflow_server/data
+app/model_server/data/
