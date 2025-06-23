@@ -73,13 +73,13 @@ def register_model(req: RegisterRequest):
             },
             remove=True,
             stdout=True,
-            stderr=True
+            stderr=False
         )
 
         try:
             preds = json.loads(output.decode())
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Prediction did not return valid JSON: {e}")
+            raise HTTPException(status_code=400, detail=f"Prediction did not return valid JSON: {e}. Output was: {output.decode()}")
 
         with open(readme_path, "r") as f:
             readme = f.read()
@@ -93,7 +93,7 @@ def register_model(req: RegisterRequest):
         # Upsert (replace if exists, insert if new)
         models_collection.replace_one({"image": image}, doc, upsert=True)
 
-        return {"status": "ok", "image": image, "predictions": preds}
+        return {"status": "ok", "image": image, "example_predictions": preds}
     except FileNotFoundError as fnf:
         raise HTTPException(status_code=400, detail=f"Missing file: {fnf}")
     except Exception as e:
@@ -160,12 +160,12 @@ def predict(
             },
             remove=True,
             stdout=True,
-            stderr=True
+            stderr=False
         )
         preds = json.loads(output.decode())
         return {"predictions": preds}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Prediction failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Prediction failed: {e}. Output was: {output.decode() if output else 'No output'}")
     finally:
         if temp_path and os.path.exists(temp_path):
             os.remove(temp_path)
