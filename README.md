@@ -1,43 +1,26 @@
 # CHARMTwinsight
 
-NOTE: This is a testing branch, attempting to integrate synthea as an API-available part of the main application. This version
-does so by running a Python FastAPI service calling out to the java application as a subprocess passing some parameters, returning
-a .zip file with contents. There are currently two issues:
+CHARMTwinsight is part of the CHARM suite of tools, focused on health data storage, predictive analytics, and synthetic data generation. 
 
-1) it is not fully working - something about the return of the .zip file (potentially related to the async-enforced time limit?)
-2) it is really slow, requiring a full spin-up of synthea + modules for each generation
+It is under active development, and currently consists of the following REST API accessible components:
 
-Another branch is investigating (even less successfully) the service solution at https://github.com/robcaruso/dhp-synthea-service
+- A [HAPI](https://hapifhir.io/) FHIR server for storage and delivery of health data in the FHIR format.
+- [Synthea](https://synthea.mitre.org/) synthetic data generation in FHIR format.
+- A model server, providing Docker-based model hosting and predictive services.
 
+Pre-trained models in development for hosting in the model server include [DPCGAN](https://github.com/sunchang0124/dp_cgans) for differentially private synthetic data generation, and a set of [Cox Proportional Hazard](https://lifelines.readthedocs.io/en/latest/fitters/regression/CoxPHFitter.html) models for common disease risk prediction from common comorbidities, trained on [AllOfUs](https://allofus.nih.gov/) EHR data.
 
-## 📌 Overview
-This repository provides a **data ingestion pipeline** that loads **synthetic patient data** (generated using [Synthea](https://github.com/synthetichealth/synthea)) into a **HAPI-FHIR server**.
-This iteration also hosts (placeholder) **data analytics** services via Python and R in a **microservices** architecture.
-# CHARMTwinsight
+Other in-development features include Python [fhiry](https://github.com/dermatologist/fhiry)-based and R [fhircrackr](https://github.com/POLAR-fhiR/fhircrackr)-based R API servers for FHIR-to-tabular conversions and analytics. 
 
-## 🏥 What is FHIR and HAPI-FHIR?
-- **FHIR (Fast Healthcare Interoperability Resources)** is a **standard** for exchanging healthcare data electronically.
-- **HAPI-FHIR** is an **open-source implementation** of FHIR, providing a Java-based **FHIR server** for storing and querying patient records.
-- CHARMTwinsight **ingests patient data to HAPI-FHIR**, and provides an analytic framework for working with the data.
+Finally, the development stack supports fetching, subsampling (for efficiency), and loading [MIMIC IV FHIR](https://physionet.org/content/mimiciv/3.1/) data into the HAPI server.
 
-## 🏗 Repository Structure
+## Repository Structure
 
-This repo is currently organized in 2 stacks, each managed `docker-compose` in conjunction with scripts in the `scripts` folder.
+- The `scripts` directory contains scripts for building, starting, stopping, and testing the various services and tools.
 
-- The `app` directory contains the components that make up the application stack:
-  - A HAPI FHIR server, `hapi`, for ingesting and serving FHIR data
-    - The `postgres_data` subfolder is used to persistently store ingested FHIR data across server restarts etc.
-    - `scripts/hapi_*.sh` provide utilities for working with the server.
-  - A `pyserver`, which can make queries to the HAPI server, potentially do analytics, and return results via a `FastAPI` REST API.
-    - This subfolder is managed by `poetry`; working in this directory `poetry add` et al. can be used to add dependency packages, interactive (non-docker) development, etc.
-    - `scripts/pyserver_*.sh` provide utilities for working with the server; note starting will re-build and re-start if already running.
-  - An `rserver`, which can make queries to the HAPI server, potentially do analytics, and return results via a `plumber` REST API.
-    - This is a simple R stack; dependencies should be added in the `Dockerfile`. If doing interactive (non-docker) development, you can use regular `install.packages()` et al. in your R session.
-    - `scripts/rserver_*.sh` provide utilities for working with the server; note starting will re-build and re-start if already running.
-    
-- The `tools` directory contains components that aren't part of the application, but useful for development, also managed by `docker-compose` for ease of development. Currently this just consists of dockerized `synthea` for generation of synthetic FHIR data.
-  - The `output` folder is meant for outputs, organized by subdirectory (e.g. `tools/output/synthea`)
-  - Other utilities in the `scripts` directory are useful here, including `docker_*.sh` (for general docker management) and `synthea_*.sh` for genererating FHIR data and pushing it to the FHIR server.
+- The `tools` directory contains components that aren't part of the application, but useful for development. Currently this just consists of Dockerized Synthea for generation of synthetic FHIR data, and `model_server_models` containing some example model definitions for use with the model server.
+
+- The `app` directory contains the components that make up the main application stack, managed by `docker-compose.yml`. 
 
 
 ## ⚙️ Installation & Setup
@@ -50,6 +33,8 @@ You will need `docker` and `docker-compose`; if using a Mac install [Docker Desk
 - **Mac users may also need to enable Docker volume storage under `System Preferences -> Privacy and Security -> Files and Folders -> Docker`**
 
 ### 2 Start Services
+
+Note: the following sections are not fully up to date with the repo organization - stay tuned.
 
 You will need at least the HAPI server running; you may also want to run the `rserver` and `pyserver`:
 
