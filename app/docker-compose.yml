@@ -8,10 +8,6 @@ services:
       - "8000:8000"
     depends_on:
       - hapi
-    volumes:
-      - shared_synthea_data:/synthea/data
-      - shared_synthea_modules:/synthea/modules
-
 
 
   rserver:
@@ -21,7 +17,6 @@ services:
     depends_on:
       - hapi
     # Run on-demand: docker-compose run rserver
-
 
 
   hapi:
@@ -36,7 +31,6 @@ services:
       - hapi_db
 
 
-
   hapi_db:
     image: postgres
     restart: always
@@ -48,17 +42,10 @@ services:
       - ./hapi/postgres_data:/var/lib/postgresql/data
 
 
-
   synthea_server:
     build: ./synthea_server
     ports:
       - "8002:8000"
-    volumes:
-      - ./output:/app/output
-      - ./config:/app/config
-      - shared_synthea_data:/app
-      - shared_synthea_modules:/app/modules
-
 
 
   model_server:
@@ -87,7 +74,5 @@ configs:
 
 
 volumes:
-  shared_synthea_data:
-  shared_synthea_modules:
   shared_tmp:
   mongo_data:
