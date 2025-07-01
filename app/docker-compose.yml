@@ -63,7 +63,7 @@ services:
 
   model_server:
     depends_on:
-      - mongo
+      - mongo_model_server
     build: ./model_server
     ports:
       - "8003:8000"
@@ -72,11 +72,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
 
 
-  mongo:
+  mongo_model_server:
     image: mongo:6
     restart: always
     ports:
-      - "27017:27017"
+      - "27017"
     volumes:
       - mongo_data:/data/db
 
