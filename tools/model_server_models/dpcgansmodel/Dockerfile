@@ -7,7 +7,7 @@ WORKDIR /app
 COPY pyproject.toml poetry.lock ./
 RUN poetry install --no-interaction --no-root
 
-COPY dpcgan_model.pkl predict.py predict README.md examples.json ./
+COPY dpcgan_model.pkl predict.py predict ./
 
 RUN chmod +x predict
 

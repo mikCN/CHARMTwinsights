@@ -2,8 +2,6 @@ import json
 import shutil
 import uuid
 import os
-import tarfile
-import io
 from fastapi import FastAPI, HTTPException, Body
 from pydantic import BaseModel
 import docker
@@ -14,9 +12,9 @@ app = FastAPI()
 client = docker.from_env()
 
 # === MongoDB connection ===
-MONGO_HOST = os.environ.get("MONGO_HOST", "mongo")
-MONGO_PORT = int(os.environ.get("MONGO_PORT", 27017))
-MONGO_DB = os.environ.get("MONGO_DB", "modeldb")
+MONGO_HOST = os.environ.get("MODEL_SERVER_MONGO_HOST", "mongo_model_server")
+MONGO_PORT = int(os.environ.get("MODEL_SERVER_MONGO_PORT", 27017))
+MONGO_DB = os.environ.get("MODEL_SERVER_MONGO_DB", "modeldb")
 
 mongo_client = MongoClient(host=MONGO_HOST, port=MONGO_PORT)
 db = mongo_client[MONGO_DB]
@@ -24,17 +22,11 @@ models_collection = db.models
 
 class RegisterRequest(BaseModel):
     image: str  # e.g., "irismodel:1.0.0"
-
-def extract_file(container, path, dest):
-    bits, stat = container.get_archive(path)
-    with tarfile.open(fileobj=io.BytesIO(b''.join(bits))) as tar:
-        for member in tar.getmembers():
-            f = tar.extractfile(member)
-            if f:
-                with open(dest, "wb") as out:
-                    out.write(f.read())
-                return
-    raise FileNotFoundError(f"{path} not found in container.")
+    title: str
+    short_description: str
+    authors: str
+    examples: List[Any]
+    readme: str
 
 @app.post("/models")
 def register_model(req: RegisterRequest):
@@ -48,23 +40,15 @@ def register_model(req: RegisterRequest):
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Image not found locally or in registry: {e}")
 
-    container = client.containers.create(image)
-    tempdir = f"/tmp/modelreg_{uuid.uuid4().hex}"
-    os.makedirs(tempdir, exist_ok=True)
     temp_json_path = None
     try:
-        ex_path = os.path.join(tempdir, "examples.json")
-        readme_path = os.path.join(tempdir, "README.md")
-        extract_file(container, "/app/examples.json", ex_path)
-        extract_file(container, "/app/README.md", readme_path)
-
+        # Write provided examples to /shared-tmp as a temp file
         temp_json_path = os.path.join("/shared-tmp", f"examples_{uuid.uuid4().hex}.json")
-        with open(ex_path, "r") as f:
-            ex_json = json.load(f)
         with open(temp_json_path, "w") as tf:
-            json.dump(ex_json, tf)
+            json.dump(req.examples, tf)
             tf.flush()
 
+        # Try running prediction using the provided examples as test input
         output = client.containers.run(
             image,
             command=["./predict", f"/shared-tmp/{os.path.basename(temp_json_path)}"],
@@ -81,62 +65,29 @@ def register_model(req: RegisterRequest):
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Prediction did not return valid JSON: {e}. Output was: {output.decode()}")
 
-        with open(readme_path, "r") as f:
-            readme = f.read()
-
         # Store in MongoDB
         doc = {
             "image": image,
-            "readme": readme,
-            "examples": ex_json
+            "title": req.title,
+            "short_description": req.short_description,
+            "authors": req.authors,
+            "readme": req.readme,
+            "examples": req.examples
         }
         # Upsert (replace if exists, insert if new)
         models_collection.replace_one({"image": image}, doc, upsert=True)
 
         return {"status": "ok", "image": image, "example_predictions": preds}
-    except FileNotFoundError as fnf:
-        raise HTTPException(status_code=400, detail=f"Missing file: {fnf}")
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Registration failed: {e}")
     finally:
-        shutil.rmtree(tempdir, ignore_errors=True)
-        container.remove()
         if temp_json_path and os.path.exists(temp_json_path):
             os.remove(temp_json_path)
-
-@app.get("/models")
-def list_models():
-    # List all models (just show image names for brevity)
-    return [m["image"] for m in models_collection.find({}, {"_id": 0, "image": 1})]
-
-@app.get("/models/{image_tag}")
-def model_info(image_tag: str):
-    m = models_collection.find_one({"image": image_tag})
-    if not m:
-        raise HTTPException(status_code=404, detail="Model not found")
-    m.pop("_id", None)  # Remove Mongo's internal ID for cleaner output
-    return m
-
-@app.get("/models/{image_tag}/readme")
-def get_model_readme(image_tag: str):
-    m = models_collection.find_one({"image": image_tag})
-    if not m:
-        raise HTTPException(status_code=404, detail="Model not found")
-    return {"readme": m.get("readme", "")}
-
-@app.get("/models/{image_tag}/examples")
-def get_model_examples(image_tag: str):
-    m = models_collection.find_one({"image": image_tag})
-    if not m:
-        raise HTTPException(status_code=404, detail="Model not found")
-    return {"examples": m.get("examples", [])}
-
-
 
 @app.post("/predict")
 def predict(
     image: str = Body(..., embed=True),
-    input: List[Any] = Body(..., embed=True)  # can also use `input: list | dict = Body(...)` for flexibility
+    input: List[Any] = Body(..., embed=True)
 ):
     # 1. Confirm the model is registered
     m = models_collection.find_one({"image": image})
@@ -169,3 +120,32 @@ def predict(
     finally:
         if temp_path and os.path.exists(temp_path):
             os.remove(temp_path)
+
+@app.get("/models")
+def list_models():
+    # Return all models with core metadata (not including README)
+    models = []
+    for m in models_collection.find({}, {"_id": 0}):
+        models.append({
+            "image": m["image"],
+            "title": m.get("title", ""),
+            "short_description": m.get("short_description", ""),
+            "authors": m.get("authors", ""),
+            "examples": m.get("examples", []),
+        })
+    return models
+
+@app.get("/models/{image_tag}")
+def model_info(image_tag: str):
+    m = models_collection.find_one({"image": image_tag})
+    if not m:
+        raise HTTPException(status_code=404, detail="Model not found")
+    # Build response with all metadata, including README
+    return {
+        "image": m["image"],
+        "title": m.get("title", ""),
+        "short_description": m.get("short_description", ""),
+        "authors": m.get("authors", ""),
+        "examples": m.get("examples", []),
+        "readme": m.get("readme", ""),
+    }
