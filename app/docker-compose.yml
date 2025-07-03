@@ -43,6 +43,8 @@ services:
 
 
   synthea_server:
+    depends_on:
+      - hapi
     build: ./synthea_server
     ports:
       - "8002:8000"

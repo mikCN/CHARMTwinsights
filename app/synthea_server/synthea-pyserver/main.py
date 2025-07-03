@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks
 from fastapi.responses import JSONResponse, StreamingResponse
 import pandas as pd
 import os
@@ -51,7 +52,7 @@ def read_root():
 
 # example call: GET http://localhost:8000/synthetic-patients?num_patients=10&num_years=1&extra_args="--exporter.fhir.use_us_core_ig true"&exporter=csv
 @app.get("/synthetic-patients")
-def get_patients(num_patients: int = 10, num_years: int = 1, exporter: str = "csv"):
+def get_patients(num_patients: int = 10, num_years: int = 1, exporter: str = "csv", background_tasks: BackgroundTasks = None):
 
     # check if the exporter is valid
     if exporter not in ["csv", "fhir"]:
@@ -113,24 +114,20 @@ def get_patients(num_patients: int = 10, num_years: int = 1, exporter: str = "cs
 
     # check if the result is an error message; indicated by a string beginning with "Error:"
     if isinstance(result, str) and result.startswith("Error:"):
-        response =  JSONResponse(status_code=500, content={"error": result})
+        response = JSONResponse(status_code=500, content={"error": result})
     else:
-    # read the zip file and return it as a response
         def iterfile():
             with open(result, 'rb') as f:
                 yield from f
 
+        # CLEANUP: use background task to delete after response is sent
+        temp_dir = os.path.dirname(result)
+        background_tasks.add_task(shutil.rmtree, temp_dir, ignore_errors=True)
         response = StreamingResponse(iterfile(), media_type="application/zip")
         response.headers['Content-Disposition'] = 'attachment; filename="synthea_output.zip"'
-        # delete the temporary directory
-        shutil.rmtree(os.path.dirname(result))
+
     return response
-    # except subprocess.CalledProcessError as e:
-    #     return JSONResponse(status_code=500, content={"error": f"Error running synthea: {e}"})
-    # except asyncio.TimeoutError:
-    #     return JSONResponse(status_code=500, content={"error": "Error: Synthea took too long to run."})
-    # except Exception as e:
-    #     return JSONResponse(status_code=500, content={"error": f"Error: {e}"})
+
 
 
 
