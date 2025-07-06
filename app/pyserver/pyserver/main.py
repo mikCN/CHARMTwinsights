@@ -3,6 +3,7 @@ import requests
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Request
 import pandas as pd
 from fhiry.fhirsearch import Fhirsearch
 import logging
@@ -28,9 +29,54 @@ app.add_middleware(
 fs = Fhirsearch(fhir_base_url="http://hapi:8080/fhir")
 SYNTHEA_SERVER_URL = "http://synthea_server:8000"
 
+
+
+
+
 @app.get("/")
 def read_root():
     return {"message": "Hello from the pyserver!!!", "status": "active"}
+
+
+
+import subprocess
+
+@app.post("/generate-cohort/synthea", response_class=JSONResponse)
+async def generate_cohort_synthea(request: Request):
+    data = await request.json()
+    method = data.get("method")
+    payload = data.get("payload")
+    if method != "SYNTHEA":
+        return JSONResponse(status_code=400, content={"error": "Only 'SYNTHEA' is supported in this endpoint."})
+    if not payload:
+        return JSONResponse(status_code=400, content={"error": "Missing payload."})
+
+    count = payload.get("count")
+    demographics = payload.get("demographics", {})
+    age_range = demographics.get("age_range", [0, 100])
+    gender_dist = demographics.get("gender_distribution", {})
+    if not count or not age_range or not gender_dist:
+        return JSONResponse(status_code=400, content={"error": "Missing required demographic fields."})
+
+    # Choose gender with highest proportion
+    gender = max(gender_dist, key=gender_dist.get)
+    min_age, max_age = age_range
+
+    cmd = ["run_synthea", "-p", str(count), "-g", gender, "-a", f"{min_age}-{max_age}"]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        output = proc.stdout
+        error = proc.stderr
+    except subprocess.CalledProcessError as e:
+        return JSONResponse(status_code=500, content={"error": str(e), "stderr": e.stderr})
+
+    return {
+        "status": "success",
+        "command": " ".join(cmd),
+        "output": output,
+        "stderr": error
+    }
+
 
 
 @app.get("/synthea/modules", response_class=JSONResponse)

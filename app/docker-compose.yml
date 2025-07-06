@@ -2,22 +2,23 @@
 # later we will want to keep them private via docker 'expose' and just publish specific container ports with 'ports'
 
 services:
-  pyserver:
-    build: ./pyserver
-    ports:
-      - "8000:8000"
-    depends_on:
-      - hapi
-    volumes:
-      - shared_synthea_data:/synthea/data
-      - shared_synthea_modules:/synthea/modules
+  #pyserver:
+  #  build: ./pyserver
+  #  ports:
+  #    - "8000:8000"
+  #  depends_on:
+  #    - hapi
+  #  volumes:
+  #    - shared_synthea_data:/synthea/data
+  #    - shared_synthea_modules:/synthea/modules
 
-  rserver:
-    build: ./rserver
-    ports:
-      - "8001:8000"
-    depends_on:
-      - hapi
+  #rserver:
+  #  build: ./rserver
+  #  ports:
+  
+  #    - "8001:8000"
+  #  depends_on:
+  #    - hapi
     # Run on-demand: docker-compose run rserver
 
   hapi:
@@ -48,8 +49,9 @@ services:
     volumes:
       - ./output:/app/output
       - ./config:/app/config
-      - shared_synthea_data:/app
-      - shared_synthea_modules:/app/modules
+      - ./synthea_cohorts:/app/syn_cohorts
+      #- shared_synthea_data:/app
+      #- shared_synthea_modules:/app/modules
 configs:
   hapi:
     file: ./hapi/hapi.application.yaml

@@ -46,7 +46,8 @@ def read_root():
 def get_patients(num_patients: int = 10, num_years: int = 1, exporter: str = "csv"):
     import os
     import subprocess
-    import tempfile
+    import tempfile  # (unused after edit)
+    import re
     import shutil
     import zipfile
     import asyncio
@@ -62,8 +63,20 @@ def get_patients(num_patients: int = 10, num_years: int = 1, exporter: str = "cs
         return JSONResponse(status_code=400, content={"error": "Number of years must be greater than 0."})
     
     async def run_synthea(num_patients, num_years, exporter):
-        # create a temporary directory to store the output
-        temp_dir = tempfile.mkdtemp()
+        # create or find the next numbered cohort directory in ../../syn_cohorts
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../syn_cohorts'))
+        if not os.path.exists(base_dir):
+            os.makedirs(base_dir)
+        # Find all subdirectories that are just numbers
+        existing = [d for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d)) and re.fullmatch(r'\d+', d)]
+        next_num = 1
+        if existing:
+            max_num = max(int(d) for d in existing)
+            next_num = max_num + 1
+        cohort_number = next_num
+        cohort_dir = os.path.join(base_dir, str(cohort_number))
+        os.makedirs(cohort_dir, exist_ok=False)  # fail if already exists, should not happen
+
         # run synthea
         cmd = [
             "java",
@@ -72,7 +85,7 @@ def get_patients(num_patients: int = 10, num_years: int = 1, exporter: str = "cs
             "-d",
             "modules",
             "--exporter.baseDirectory",
-            temp_dir,
+            cohort_dir,
             "-p",
             str(num_patients),
             "--exporter.years_of_history",
@@ -86,42 +99,41 @@ def get_patients(num_patients: int = 10, num_years: int = 1, exporter: str = "cs
         cmd.append("true")
         subprocess.run(cmd, check=True)
 
-        # zip it up
-        zip_file = os.path.join(temp_dir, "synthea_output.zip")
+        # zip up the cohort folder into syn_cohorts as cohort-{cohort_number}.zip
+        zip_file = os.path.join(base_dir, f"cohort-{cohort_number}.zip")
         with zipfile.ZipFile(zip_file, 'w') as zf:
-            for root, dirs, files in os.walk(temp_dir):
+            for root, dirs, files in os.walk(cohort_dir):
                 for file in files:
                     if file.endswith(".csv") or file.endswith(".json"):
-                        zf.write(os.path.join(root, file), os.path.relpath(os.path.join(root, file), temp_dir))
+                        zf.write(os.path.join(root, file), os.path.relpath(os.path.join(root, file), cohort_dir))
 
-        # check the size of the zip file
+        # check the size of the zip file (optional, not enforced)
         zip_size = os.path.getsize(zip_file)
-        if zip_size > 10 * 1024 * 1024:
+        #if zip_size > 10 * 1024 * 1024:
             # return an error message as a string
-            return "Error: Zip file is too large. Maximum size is 10 MB."
+            #return "Error: Zip file is too large. Maximum size is 10 MB."
 
-        # return the path to the zip file
-        return zip_file
+        # return both the path to the zip file and the cohort folder
+        return zip_file, cohort_dir
 
     # run the synthea command in a separate thread so it doesn't block the main thread and we can enforce the timeout
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     #try:
-    result = loop.run_until_complete(asyncio.wait_for(run_synthea(num_patients, num_years, exporter), timeout=10)) # getting a string error here
+    result = loop.run_until_complete(asyncio.wait_for(run_synthea(num_patients, num_years, exporter), timeout=10))
     print("RESULT:", result)
     # check if the result is an error message; indicated by a string beginning with "Error:"
     if isinstance(result, str) and result.startswith("Error:"):
         response =  JSONResponse(status_code=500, content={"error": result})
     else:
-    # read the zip file and return it as a response
+        zip_path, cohort_dir = result
         def iterfile():
-            with open(result, 'rb') as f:
+            with open(zip_path, 'rb') as f:
                 yield from f
 
         response = StreamingResponse(iterfile(), media_type="application/zip")
-        response.headers['Content-Disposition'] = 'attachment; filename="synthea_output.zip"'
-        # delete the temporary directory
-        shutil.rmtree(os.path.dirname(result))
+        response.headers['Content-Disposition'] = f'attachment; filename="{os.path.basename(zip_path)}"'
+        # Do not delete the cohort folder; keep both the folder and the zip file
     return response
     # except subprocess.CalledProcessError as e:
     #     return JSONResponse(status_code=500, content={"error": f"Error running synthea: {e}"})
@@ -133,6 +145,6 @@ def get_patients(num_patients: int = 10, num_years: int = 1, exporter: str = "cs
 
 if __name__ == "__main__":
     import uvicorn
-    get_patients()
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
+# UNIQUE_IDENTIFIER_1751817569

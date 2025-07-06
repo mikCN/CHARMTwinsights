@@ -19,5 +19,6 @@ Thumbs.db
 .ipynb_checkpoints
 
 # Large files and directories (e.g., Synthea-generated data)
+syn_cohorts/
 tools/output/
 app/hapi/postgres_data
