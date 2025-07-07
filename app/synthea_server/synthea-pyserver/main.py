@@ -82,8 +82,8 @@ def get_patients(num_patients: int = 10, num_years: int = 1, exporter: str = "cs
             str(num_years),
         ]
         # if exporter == "csv":
-        cmd.append("--exporter.csv.export")
-        cmd.append("true")
+        # cmd.append("--exporter.csv.export")
+        # cmd.append("true")
         #elif exporter == "fhir":
         cmd.append("--exporter.fhir.use_us_core_ig")
         cmd.append("true")
@@ -327,6 +327,85 @@ async def get_module_content(module_name: str):
             status_code=500,
             detail=f"Unexpected error: {str(e)}"
         )
+
+
+from fastapi import FastAPI, HTTPException, Body
+import tempfile, shutil, os, subprocess, json, glob, requests
+
+def run_synthea(num_patients, num_years, exporter):
+    temp_dir = tempfile.mkdtemp()
+    cmd = [
+        "java", "-jar", "synthea-with-dependencies.jar",
+        "-d", "modules",
+        "--exporter.baseDirectory", temp_dir,
+        "-p", str(num_patients),
+        "--exporter.years_of_history", str(num_years),
+        "--exporter.fhir.export", "true"
+    ]
+    print(cmd)
+    subprocess.run(cmd, check=True)
+    fhir_dir = os.path.join(temp_dir, "fhir")
+    if not os.path.isdir(fhir_dir):
+        raise Exception("FHIR output directory not found!")
+    return temp_dir, fhir_dir
+
+def post_bundle(json_file, hapi_url):
+    with open(json_file, "r") as f:
+        bundle = json.load(f)
+    bundle_type = bundle.get("type")
+    # Decide endpoint based on bundle type
+    if bundle_type in ("transaction", "batch"):
+        url = hapi_url  # base URL, e.g. http://hapi:8080/fhir
+    else:
+        url = hapi_url.rstrip("/") + "/Bundle"
+    try:
+        r = requests.post(url, json=bundle, headers={"Content-Type": "application/fhir+json"})
+        r.raise_for_status()
+        return True, r.text
+    except requests.HTTPError as e:
+        error_body = r.text if 'r' in locals() else str(e)
+        return False, error_body
+    except Exception as e:
+        return False, str(e)
+
+
+@app.post("/synthetic-patients/push")
+def push_patients(num_patients: int = 10, num_years: int = 1):
+    temp_dir, fhir_dir = run_synthea(num_patients, num_years, "fhir")
+    hapi_url = "http://hapi:8080/fhir"
+
+    try:
+        # 1. Practitioner and hospital info first
+        special_files = sorted(glob.glob(os.path.join(fhir_dir, "practitionerInformation*.json"))) + \
+                        sorted(glob.glob(os.path.join(fhir_dir, "hospitalInformation*.json")))
+        all_files = sorted(glob.glob(os.path.join(fhir_dir, "*.json")))
+        patient_files = [f for f in all_files if f not in special_files]
+
+        results = []
+        # First special files
+        for json_file in special_files:
+            success, msg = post_bundle(json_file, hapi_url)
+            results.append({"file": os.path.basename(json_file), "success": success, "msg": msg})
+
+        # Then patient bundles
+        for json_file in patient_files:
+            success, msg = post_bundle(json_file, hapi_url)
+            results.append({"file": os.path.basename(json_file), "success": success, "msg": msg})
+
+        summary = {
+            "total_bundles": len(results),
+            "success": sum(1 for r in results if r["success"]),
+            "fail": sum(1 for r in results if not r["success"])
+        }
+        return summary
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+
+
+
+
 
 if __name__ == "__main__":
     import uvicorn
