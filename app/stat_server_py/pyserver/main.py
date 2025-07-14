@@ -25,8 +25,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-fs = Fhirsearch(fhir_base_url="http://hapi:8080/fhir")
-SYNTHEA_SERVER_URL = "http://synthea_server:8000"
+from .config import settings
+
+fs = Fhirsearch(fhir_base_url=settings.hapi_url)
+SYNTHEA_SERVER_URL = settings.synthea_server_url
 
 @app.get("/")
 def read_root():
