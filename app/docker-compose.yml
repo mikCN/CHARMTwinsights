@@ -29,6 +29,8 @@ services:
   hapi:
     container_name: hapi
     image: "hapiproject/hapi:latest"
+    ports:
+      - "8080:8080"
     configs:
       - source: hapi
         target: /app/config/application.yaml
