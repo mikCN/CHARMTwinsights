@@ -2,21 +2,20 @@
 # later we will want to keep them private via docker 'expose' and just publish specific container ports with 'ports'
 
 services:
-  pyserver:
-    build: ./pyserver
+  stat_server_py:
+    build: ./stat_server_py
     ports:
       - "8000:8000"
     depends_on:
       - hapi
 
 
-  rserver:
-    build: ./rserver
+  stat_server_r:
+    build: ./stat_server_r
     ports:
       - "8001:8000"
     depends_on:
       - hapi
-    # Run on-demand: docker-compose run rserver
 
 
   hapi:
@@ -75,6 +74,7 @@ configs:
     file: ./hapi/hapi.application.yaml
 
 
+# shared_tmp is used by the model server to share files with spun-up model containers; do not remove
 volumes:
   shared_tmp:
   mongo_data:
