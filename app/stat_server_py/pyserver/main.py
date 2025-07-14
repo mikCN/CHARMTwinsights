@@ -30,14 +30,6 @@ from .config import settings
 fs = Fhirsearch(fhir_base_url=settings.hapi_url)
 SYNTHEA_SERVER_URL = settings.synthea_server_url
 
-@app.get("/")
-def read_root():
-    return {"message": "Hello from the pyserver!!!", "status": "active"}
-
-
-@app.get("/health", response_class=JSONResponse)
-async def health_check():
-    return {"status": "healthy"}
 
 @app.get("/patients", response_class=JSONResponse)
 async def get_patients(

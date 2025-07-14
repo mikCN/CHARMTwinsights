@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/modeling",
-    tags=["modeling"],
+    tags=["Modeling"],
 )
 
 # --- Pydantic Models ---

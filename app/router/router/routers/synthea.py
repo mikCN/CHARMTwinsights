@@ -9,35 +9,32 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/synthetic/synthea",
-    tags=["synthea"],
+    tags=["Synthetic Data Generation"],
 )
 
-@router.get("/generate-synthetic-patients", response_class=JSONResponse)
+@router.post("/generate-synthetic-patients", response_class=JSONResponse)
 async def get_synthetic_patients(
     num_patients: int = Query(10, ge=1, le=100),
     num_years: int = Query(1, ge=1, le=100),
     cohort_id: str = Query("default", min_length=1)
 ):
-    """
-    Get synthetic patients from the Synthea server.
-    """
     url = f"{settings.synthea_server_url}/synthetic-patients"
-    params = {
+    data = {
         "num_patients": num_patients,
         "num_years": num_years,
         "cohort_id": cohort_id,
     }
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.get(url, params=params)
+            resp = await client.post(url, json=data)
             resp.raise_for_status()
             return resp.json()
     except httpx.HTTPStatusError as e:
-        logger.error(f"Synthea error: {e.response.text}")
-        detail = e.response.text or "Error fetching synthetic patients"
+        logger.error(f"Synthea backend error: {e.response.text}")
+        detail = e.response.text or "Error generating synthetic patients"
         raise HTTPException(status_code=e.response.status_code, detail=detail)
     except httpx.RequestError as e:
-        logger.error(f"Error fetching synthetic patients: {e}")
+        logger.error(f"Error contacting Synthea backend: {e}")
         raise HTTPException(status_code=500, detail="Synthea server unreachable")
 
 @router.get("/modules", response_class=JSONResponse)

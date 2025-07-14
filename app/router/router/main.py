@@ -4,7 +4,8 @@ import logging
 
 # Import routers
 from .routers import synthea
-from .routers import modeling  # Ensure you have a modeling.py in the routers directory
+from .routers import modeling
+from .routers import stat_server_py
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,6 +31,7 @@ app.add_middleware(
 
 app.include_router(synthea.router)
 app.include_router(modeling.router)
+app.include_router(stat_server_py.router)
 
 @app.get("/healthz")
 async def health_check():
