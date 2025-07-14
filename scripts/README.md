@@ -2,6 +2,8 @@
 
 ## Build Docker Images
 
+### Application Images
+
 First, build the images for the application:
 
 ```bash
@@ -10,6 +12,8 @@ docker compose build --with-dependencies router
 ```
 
 If you have having trouble, you might add a `--no-cache` to force rebuilding images from scratch, and/or a `--progress plain` to see complete build progress.
+
+### Model Images
 
 Next, build the default images for the model-hosting service. These default models may be complemented with other Docker-based models via the API, provided the referenced images are on the same host as the app, or (in theory) available on Dockerhub or another container registry.
 
