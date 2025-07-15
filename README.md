@@ -19,6 +19,8 @@ CHARMTwinsight is designed as a microservices architecture managed with `docker 
 
 <img src="app/arch.png" style="align: center" width="90%">
 
+*Note: this architecture represents implemented data flows; future features may connect HAPI FHIR to the model server, etc.*
+
 **`router`**: Externally-facing REST API providing access to backend services. Built with FastAPI for flexibility.
 
 **`hapi`**: HAPI FHIR server for efficient and flexible storage and querying of FHIR data.
@@ -122,4 +124,9 @@ model_server/models/test_predict_models.sh
 
 Summary statistics about generated patient data are available at `http://localhost/stats`. Examples CURs are available via script:
 
-...
+```bash
+# working dir: app
+stat_server_py/test_stats.sh
+```
+
+
