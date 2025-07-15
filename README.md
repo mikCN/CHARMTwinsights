@@ -2,6 +2,25 @@
 
 # CHARMTwinsight
 
+## Table of Contents
+
+1. [Overview](#overview)
+2. [Architecture](#architecture)
+3. [Installation and Usage](#installation-and-usage)
+    - [0. Prerequisites](#0-prerequisites)
+    - [1. Build Application Images](#1-build-application-images)
+    - [2. Build Model Images](#2-build-model-images)
+    - [3. Start App](#3-start-app)
+    - [4. Load Models](#4-load-models)
+    - [5. Generate Synthetic Data](#5-generate-synthetic-data)
+    - [6. Test Models](#6-test-predictive-models)
+    - [7. Test Analytics](#7-test-summary-statistics)
+    - [8. Cleaning up](#8-cleaning-up)
+4. [Development](#development)
+    - [Recommendations](#recommendations)
+    - [Iterating](#iterating)
+5. [Miscellaneous](#miscellaneous)
+
 ## Overview
 
 CHARMTwinsight is part of the [CHARM](https://github.com/CHARM-BDF/) suite of tools, focused on health data storage, predictive analytics, and synthetic data generation.
@@ -111,7 +130,7 @@ synthea_server/gen_patients.sh
 
 These data are pushed to the FHIR server accessible at `http://localhost:8080` for development purposes.
 
-### 6. Test Predictive Models
+### 6. Test Models
 
 Predictive model capabilities are accessed under endpoints at `http://localhost/modeling`. Example CURLs are available via script:
 
@@ -122,7 +141,7 @@ model_server/models/test_predict_models.sh
 
 As above, skip if you are not developing or using models.
 
-### 7. Test Summary Statistics
+### 7. Test Analytics
 
 Summary statistics about generated patient data are available under endpoints at `http://localhost/stats`. Examples CURLs are available via script:
 
