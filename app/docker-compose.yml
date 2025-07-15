@@ -57,7 +57,7 @@ services:
 
   model_server:
     depends_on:
-      - mongo_model_server
+      - model_server_db
     build: ./model_server
     volumes:
       - shared_tmp:/shared-tmp
