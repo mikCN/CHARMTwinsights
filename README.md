@@ -49,14 +49,14 @@ You will need `docker`; if using a Mac install [Docker Desktop](https://www.dock
 
 ### 1. Build Application Images
 
-First, build the images for the application with `docker compose`:
+First, build the images for the application with `docker compose`. All `docker compose` commands need to be run in the same directory as the `docker-compose.yml` file.
 
 ```bash
 # working dir: app
 docker compose build
 ```
 
-If you have having trouble, you might add a `--no-cache` to force rebuilding images from scratch, and/or a `--progress=plain` to see complete build progress and error logs.
+If you are having trouble, you might add a `--no-cache` to force rebuilding images from scratch, and/or a `--progress=plain` to see complete build progress and error logs.
 
 ### 2. Build Model Images
 
@@ -124,7 +124,7 @@ As above, skip if you are not developing or using models.
 
 ### 7. Test Summary Statistics
 
-Summary statistics about generated patient data are available under endpoints at `http://localhost/stats`. Examples CURs are available via script:
+Summary statistics about generated patient data are available under endpoints at `http://localhost/stats`. Examples CURLs are available via script:
 
 ```bash
 # working dir: app
@@ -148,7 +148,7 @@ database **is persisted**. To remove this data, simply remove the files in `app/
 rm -rf hapi/postgres_data/*
 ```
 
-Other data are not persisted, though any built model docker images will remain on your local machine unless removed via docker commands (or Docker Desktop).
+Other data are not persisted (e.g. model metadata loaded into the `model_server`), though any built model docker images will remain on your local machine unless removed via docker commands (or Docker Desktop).
 
 ## Development
 
@@ -194,4 +194,13 @@ After the application has been initialized and databases populated, a typical wo
 
     - Re-upping only the relevant service will cause only it and dependent services that have changed to be re-initialized; you won't have to wait for HAPI or other dependent services to restart. Bringing up an an attached state, with a given target, will only show logs for the specific service (useful for print-debugging).
 
-A common development loop is thus simply `docker compose build --with-dependencies <service_name> && docker compose up <service_name>`, using Ctrl-C and rerunning to effectuate code changes, accessing services directly on their local port (e.g. `http://localhost:8001` for `stat_server_py`).
+A common development loop is thus simply `docker compose build --with-dependencies <service_name> && docker compose up <service_name>`, using Ctrl-C and rerunning to effectuate code changes, accessing services directly on their local port for testing (e.g. `http://localhost:8001` for `stat_server_py`).
+
+## Miscellaneous
+
+The `scripts` folder contains a few useful scripts:
+
+- `docker_status.sh`: list various running docker resources
+- `docker_clean.sh`: clobber running docker resources (containers, networks, volumes)
+- `mimic_fetch_decrypt.sh`: fetch MIMIC IV FHIR data and decrypt it (MIMIC IV access approval required, contact Shawn for password)
+- `mimic_sample_push_hapi.py`: pushes a rich subsample of the MIMIC IV FHIR data to the running HAPI server for testing

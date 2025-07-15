@@ -21,7 +21,7 @@ PROJECT_ROOT = subprocess.check_output(
 # the domains (file prefixes) listed in INCLUDE_ALL will be fully loaded first
 # and the rest will be sampled to a maximum of MAX_PER_PT_SAMPLE records per patient
 
-LOCATION = os.path.join(PROJECT_ROOT, "tools/output/mimic_data/mimic_iv_100pt_demo/fhir")
+LOCATION = os.path.join(PROJECT_ROOT, "scripts/mimic_data/mimic_iv_100pt_demo/fhir")
 INCLUDE_ALL = ["Location", "Organization", "Medication", "Patient"]
 FHIR_URL = "http://localhost:8080/fhir"
 MAX_PER_PT_SAMPLE = 10
