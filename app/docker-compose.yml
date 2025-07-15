@@ -64,7 +64,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
 
 
-  mongo_model_server:
+  model_server_db:
     image: mongo:6
     restart: always
 
@@ -77,4 +77,3 @@ configs:
 # shared_tmp is used by the model server to share files with spun-up model containers; do not remove
 volumes:
   shared_tmp:
-  mongo_data:

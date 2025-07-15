@@ -12,7 +12,7 @@ app = FastAPI()
 client = docker.from_env()
 
 # === MongoDB connection ===
-MONGO_HOST = os.environ.get("MODEL_SERVER_MONGO_HOST", "mongo_model_server")
+MONGO_HOST = os.environ.get("MODEL_SERVER_MONGO_HOST", "model_server_db")
 MONGO_PORT = int(os.environ.get("MODEL_SERVER_MONGO_PORT", 27017))
 MONGO_DB = os.environ.get("MODEL_SERVER_MONGO_DB", "modeldb")
 
