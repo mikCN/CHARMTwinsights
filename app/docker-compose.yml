@@ -1,5 +1,5 @@
-# note that 'ports' makes these services available to the host on hostpost:containerport
-# later we will want to keep them private via docker 'expose' and just publish specific container ports with 'ports'
+# this 'production' docker compose does not expose internal service ports to the host machine
+# docker-compose.override.yaml does, and is included by default in docker-compose commands
 
 services:
   router:

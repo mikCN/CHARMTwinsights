@@ -53,7 +53,7 @@ First, build the images for the application with `docker compose`:
 
 ```bash
 # working dir: app
-docker compose build --with-dependencies router
+docker compose build
 ```
 
 If you have having trouble, you might add a `--no-cache` to force rebuilding images from scratch, and/or a `--progress=plain` to see complete build progress and error logs.
@@ -75,12 +75,12 @@ Using `docker compose`:
 
 ```bash
 # working dir: app
-docker compose up --detach router
+docker compose up --detach
 ```
 
-This starts the application in a detached state, requring a `docker compose down` to stop the various containers. By default docker compose only starts/restarts containers that are not running or have changed; adding `--force-recreate` forces the removal and recreation. 
+This starts all services in the application in a 'detached' state; subsequent docker compose commands (e.g. `docker compose logs`, `docker compose down`) can be used for management. 
 
-The main API endpoints will be browsable at [`http://localhost/docs`](http://localhost/docs). For development purposes, the HAPI FHIR server is also exposed at [`http://localhost:8080`](http://localhost:8080); **This can be used to browse generated FHIR data and run ad-hoc queries.**
+The main API endpoints will be browsable at [`http://localhost/docs`](http://localhost/docs).
 
 ### 4. Load Models
 
@@ -113,20 +113,85 @@ These data are pushed to the FHIR server accessible at `http://localhost:8080` f
 
 ### 6. Test Predictive Models
 
-Predictive model capabilities are accessed at `http://localhost/modeling`. Example CURLs are available via script:
+Predictive model capabilities are accessed under endpoints at `http://localhost/modeling`. Example CURLs are available via script:
 
 ```bash
 # working dir: app
 model_server/models/test_predict_models.sh
 ```
 
+As above, skip if you are not developing or using models.
+
 ### 7. Test Summary Statistics
 
-Summary statistics about generated patient data are available at `http://localhost/stats`. Examples CURs are available via script:
+Summary statistics about generated patient data are available under endpoints at `http://localhost/stats`. Examples CURs are available via script:
 
 ```bash
 # working dir: app
 stat_server_py/test_stats.sh
 ```
 
+### 8. Cleaning up
 
+Use docker compose to stop the services and cleanup:
+
+```bash
+# working dir: app
+docker compose down
+```
+
+Because generating and loading synthetic data into the FHIR server is time consuming, data for the backing Postgres 
+database **is persisted**. To remove this data, simply remove the files in `app/hapi/postgres_data/`:
+
+```bash
+# working dir: app
+rm -rf hapi/postgres_data/*
+```
+
+Other data are not persisted, though any built model docker images will remain on your local machine unless removed via docker commands (or Docker Desktop).
+
+## Development
+
+### Recommendations
+
+Ideally, features are added to the service they are most aligned with, adding additional services for feature sets sufficiently unique.
+To keep with a microservice architecture, services should not share disk storage, but communicate over the docker-internal network via REST.
+
+### Iterating
+
+As noted above, FHIR data stored in the HAPI server is persisted across runs; this allows the developer to generate synthetic data
+(a time-consuming process) once while while iterating on other features. 
+
+For development purposes, each service is exposed to the localhost on independent ports (applied automatically via `app/docker-compose.override.yaml`):
+
+- router: localhost:80
+- hapi: localhost:8080
+- stat_server_py: localhost:8001
+- stat_server_r: localhost:8002
+- synthea_server: localhost:8003
+- model_server: localhost:8004
+
+*The HAPI server in particular is useful for browsing FHIR data and testing ad-hoc queries.*
+
+Individual services can be rapidly iterated on even if they depend on others.
+After the application has been initialized and databases populated, a typical workflow would be:
+
+1. Initialize application as above in a detached state.
+1. Make changes to service code (e.g. in `app/stat_server_py/pyserver/main.py`).
+
+    - For Python services, add packages by running `poetry add <package-name>` next to the `pyproject.toml` file; for R services, add the package to the Dockerfile.
+
+1. Rebuild relevant containers with `docker compose build --with-dependencies <service_name>`
+
+    - This should only rebuild services that have changed and that are dependent on the service; Dockerfiles have also been designed to maximize use of layer caching for fast rebuilds. If you run into trouble and think caching is or other persistent data are an issue, you can try these more forceful and time-consuming rebuilds:
+   
+      - `docker compose down --remove-orphans --volumes`
+      - `rm -rf hapi/postgres_data/*` (to remove HAPI data)
+      - `docker compose build --no-cache --progress=plain` (without a target and cache to force rebuild of all services, with plain logging for surfacing potential build errors)
+      - `docker compose up --force-recreate --with-dependencies --renew-anon-volumes --detach` (redeploy app)
+
+1. Restart the services with `docker compose up <service_name>`.
+
+    - Re-upping only the relevant service will cause only it and dependent services that have changed to be re-initialized; you won't have to wait for HAPI or other dependent services to restart. Bringing up an an attached state, with a given target, will only show logs for the specific service (useful for print-debugging).
+
+A common development loop is thus simply `docker compose build --with-dependencies <service_name> && docker compose up <service_name>`, using Ctrl-C and rerunning to effectuate code changes, accessing services directly on their local port (e.g. `http://localhost:8001` for `stat_server_py`).
