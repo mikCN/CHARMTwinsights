@@ -60,7 +60,8 @@ async def get_patients(
             logger.warning("No patients found or empty dataframe returned")
             return {"patients": []}
         
-        df = df.where(pd.notna(df), None)
+        # replace NaN values with None
+        df = df.astype(object).where(pd.notna(df), None)
         
         patients_dict = df.to_dict(orient='records')
         
@@ -79,7 +80,8 @@ async def get_patient_by_id(patient_id: str):
         if df is None or df.empty:
             raise HTTPException(status_code=404, detail=f"Patient with ID {patient_id} not found")
         
-        df = df.where(pd.notna(df), None)
+        # replace NaN values with None
+        df = df.astype(object).where(pd.notna(df), None)
         
         patient_dict = df.to_dict(orient='records')[0]
         
@@ -108,7 +110,8 @@ async def get_conditions(
         if df is None or df.empty:
             return {"conditions": []}
         
-        df = df.where(pd.notna(df), None)
+        # replace NaN values with None
+        df = df.astype(object).where(pd.notna(df), None)
         
         conditions_dict = df.to_dict(orient='records')
         
@@ -116,7 +119,18 @@ async def get_conditions(
         
     except Exception as e:
         logger.error(f"Error retrieving conditions: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error retrieving conditions: {str(e)}")
+        raise HTTPException
+
+
+# example queries:
+# get specific a subset of properties from Patient resources in the default cohort
+# {settings.hapi_url}/Patient?_tag=urn:charm:cohort|default&_elements=id,name,gender
+# get all Patient resources in cohort named cohort1
+# {settings.hapi_url}/Patient?_tag=urn:charm:cohort|cohort1
+# same works for Conditions, Observations, etc.
+# given a list of Patient IDs (from above), we can also get all Conditions for those patients
+# {settings.hapi_url}/Condition?subject=Patient/123,Patient/456
+
 
 if __name__ == "__main__":
     import uvicorn

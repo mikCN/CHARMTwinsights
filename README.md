@@ -54,11 +54,11 @@ First, build the images for the application with `docker compose`:
 docker compose build --with-dependencies router
 ```
 
-If you have having trouble, you might add a `--no-cache` to force rebuilding images from scratch, and/or a `--progress plain` to see complete build progress.
+If you have having trouble, you might add a `--no-cache` to force rebuilding images from scratch, and/or a `--progress=plain` to see complete build progress and error logs.
 
 ### 2. Build Model Images
 
-Next, build the default images for the model-hosting service. These default models may be complemented with other Docker-based models via the API, provided the referenced images are on the same host as the app, or available on Dockerhub or another container registry.
+Next, build the default images for the model-hosting service. These default models may be complemented with other Docker-based models via the API, provided the referenced images are on the same host as the app, or available on Dockerhub or another container registry. You can skip this step if you don't intend to use the predefined models.
 
 ```bash
 # working dir: app
@@ -73,16 +73,17 @@ Using `docker compose`:
 
 ```bash
 # working dir: app
-docker compose up router
+docker compose up --detach router
 ```
 
-If you want to run the applicatio detached, use `docker compose up --detach router`. Adding `--force-recreate` forces the removal of existing services (by default docker compose only restarts services that have changed). The main API endpoints will be browsable at [`http://localhost/docs`](http://localhost/docs).
+This starts the application in a detached state, requring a `docker compose down` to stop the various containers. By default docker compose only starts/restarts containers that are not running or have changed; adding `--force-recreate` forces the removal and recreation. 
 
-For development purposes, the HAPI FHIR server is exposed at [`http://localhost:8080`](http://localhost:8080); **This can be used to browse generated FHIR data and run ad-hoc queries.**
+The main API endpoints will be browsable at [`http://localhost/docs`](http://localhost/docs). For development purposes, the HAPI FHIR server is also exposed at [`http://localhost:8080`](http://localhost:8080); **This can be used to browse generated FHIR data and run ad-hoc queries.**
 
 ### 4. Load Models
 
-The default set of predictive and generative models must be registered with the model server before use. 
+The default set of predictive and generative models must be registered with the model server before use. You can skip this step if you
+don't intend to use the predefined models.
 
 ```bash
 # working dir: app
@@ -99,7 +100,7 @@ and `cohort_id`. The patients will be simulated with Synthea, and their records 
 
 It is possible to re-use the same cohort ID across multiple generations, in which case newly generated patients will be added to the cohort.
 
-A testing script demonstrates this, creating a `cohort1` with 6 members, and a `cohort2` with 3. Each generation takes a few seconds.
+A testing script demonstrates this (retrying until the Synthea and HAPI services are up and running), creating a `cohort1` with 6 members, and a `cohort2` with 3. Each generation takes a few seconds.
 
 ```bash
 # working dir: app
@@ -108,3 +109,17 @@ synthea_server/gen_patients.sh
 
 These data are pushed to the FHIR server accessible at `http://localhost:8080` for development purposes.
 
+### 6. Test Predictive Models
+
+Predictive model capabilities are accessed at `http://localhost/modeling`. Example CURLs are available via script:
+
+```bash
+# working dir: app
+model_server/models/test_predict_models.sh
+```
+
+### 7. Test Summary Statistics
+
+Summary statistics about generated patient data are available at `http://localhost/stats`. Examples CURs are available via script:
+
+...
