@@ -7,6 +7,7 @@ import tempfile
 import shutil
 
 import tempfile, shutil, os, subprocess, json, glob, requests
+from pydantic import BaseModel
 
 
 
@@ -19,10 +20,14 @@ def redirect_to_docs():
     return JSONResponse(status_code=307, content={"message": "Redirecting to /docs for API documentation."}, headers={"Location": "/docs"})
 
 
-def run_synthea(num_patients, num_years):
+def run_synthea(num_patients, num_years, min_age=0, max_age=140, gender="both"):
     """ Runs Synthea to generate synthetic patient data.
-    Args:        num_patients: Number of synthetic patients to generate.
+    Args:
+        num_patients: Number of synthetic patients to generate.
         num_years: Number of years of history to generate for each patient.
+        min_age: Minimum age of generated patients (default: 0).
+        max_age: Maximum age of generated patients (default: 140).
+        gender: Gender of generated patients ("both", "male", or "female", default: "both").
     Returns:
         A tuple (temp_dir, fhir_dir) where:
         - temp_dir: Temporary directory where Synthea output is stored.
@@ -39,6 +44,21 @@ def run_synthea(num_patients, num_years):
         "--exporter.years_of_history", str(num_years),
         "--exporter.fhir.export", "true"
     ]
+    
+    # Handle age parameters
+    if min_age != 0 or max_age != 140:
+        cmd.extend(["-a", f"{min_age}-{max_age}"])
+    
+    # Handle gender parameter
+    gender_norm = gender.strip().lower()
+    gender_arg = None
+    if gender_norm in ["m", "male"]:
+        gender_arg = "M"
+    elif gender_norm in ["f", "female"]:
+        gender_arg = "F"
+    # Only add -g if gender is not 'both'
+    if gender_arg:
+        cmd.extend(["-g", gender_arg])
     print(cmd)
     subprocess.run(cmd, check=True)
     fhir_dir = os.path.join(temp_dir, "fhir")
@@ -93,19 +113,107 @@ def apply_tags(resource, tags: dict[str, str] = None):
 
 
 
-def fetch_group_by_id(hapi_url, cohort_id):
-    """ Fetches a FHIR Group resource by its ID from the HAPI FHIR server."""
-    url = f"{hapi_url.rstrip('/')}/Group/{cohort_id}"
+def fetch_group_by_id(hapi_url, group_id):
+    """ Fetches a FHIR Group resource by ID from the HAPI FHIR server.
+    Args:
+        hapi_url: Base URL of the HAPI FHIR server.
+        group_id: ID of the Group resource to fetch.
+    Returns:
+        The Group resource as a dictionary if found, None otherwise.
+    """
+    url = f"{hapi_url.rstrip('/')}/Group/{group_id}"
     try:
-        r = requests.get(url, headers={"Accept": "application/fhir+json"})
+        r = requests.get(url)
         if r.status_code == 200:
             return r.json()
-        elif r.status_code == 404:
-            return None
-        else:
-            r.raise_for_status()
+        return None
     except Exception as e:
-        raise RuntimeError(f"Error fetching Group/{cohort_id}: {e}")
+        print(f"Error fetching group {group_id}: {e}")
+        return None
+
+
+def fetch_all_groups(hapi_url):
+    """ Fetches all FHIR Group resources from the HAPI FHIR server.
+    Args:
+        hapi_url: Base URL of the HAPI FHIR server.
+    Returns:
+        A list of Group resources as dictionaries.
+    """
+    try:
+        all_groups = []
+        next_url = f"{hapi_url.rstrip('/')}/Group?_count=500"  # Increased count for efficiency
+        
+        # Keep fetching pages until there are no more
+        while next_url:
+            print(f"Fetching groups from: {next_url}")
+            r = requests.get(next_url)
+            if r.status_code != 200:
+                print(f"Error fetching groups: HTTP {r.status_code}")
+                break
+                
+            bundle = r.json()
+            
+            # Extract groups from this page
+            if "entry" in bundle:
+                page_groups = [entry["resource"] for entry in bundle["entry"]]
+                all_groups.extend(page_groups)
+                print(f"Retrieved {len(page_groups)} groups from this page. Total so far: {len(all_groups)}")
+            
+            # Look for the 'next' link to continue pagination
+            next_url = None
+            if "link" in bundle:
+                for link in bundle["link"]:
+                    if link.get("relation") == "next" and "url" in link:
+                        next_url = link["url"]
+                        break
+        
+        print(f"Total groups retrieved: {len(all_groups)}")
+        return all_groups
+    except Exception as e:
+        print(f"Error fetching groups: {e}")
+        return []
+
+
+def fetch_all_patients(hapi_url):
+    """ Fetches all FHIR Patient resources from the HAPI FHIR server.
+    Args:
+        hapi_url: Base URL of the HAPI FHIR server.
+    Returns:
+        A list of Patient resources as dictionaries.
+    """
+    try:
+        all_patients = []
+        next_url = f"{hapi_url.rstrip('/')}/Patient?_count=500"  # Increased count for efficiency
+        
+        # Keep fetching pages until there are no more
+        while next_url:
+            print(f"Fetching patients from: {next_url}")
+            r = requests.get(next_url)
+            if r.status_code != 200:
+                print(f"Error fetching patients: HTTP {r.status_code}")
+                break
+                
+            bundle = r.json()
+            
+            # Extract patients from this page
+            if "entry" in bundle:
+                page_patients = [entry["resource"] for entry in bundle["entry"]]
+                all_patients.extend(page_patients)
+                print(f"Retrieved {len(page_patients)} patients from this page. Total so far: {len(all_patients)}")
+            
+            # Look for the 'next' link to continue pagination
+            next_url = None
+            if "link" in bundle:
+                for link in bundle["link"]:
+                    if link.get("relation") == "next" and "url" in link:
+                        next_url = link["url"]
+                        break
+        
+        print(f"Total patients retrieved: {len(all_patients)}")
+        return all_patients
+    except Exception as e:
+        print(f"Error fetching patients: {e}")
+        return []
 
 
 def merge_group_members(existing_group, new_patient_ids):
@@ -222,8 +330,16 @@ def upsert_group(hapi_url, cohort_id, new_patient_ids, tags):
     return r.text
 
 
+class SyntheaRequest(BaseModel):
+    num_patients: int = 10
+    num_years: int = 1
+    cohort_id: str = "default"
+    min_age: int = 0
+    max_age: int = 140
+    gender: str = "both"
+
 @app.post("/synthetic-patients")
-def push_patients(num_patients: int = 10, num_years: int = 1, cohort_id: str = "default"):
+def push_patients(request: SyntheaRequest):
     """ Pushes synthetic patient data generated by Synthea to a HAPI FHIR server.
     Args:
         num_patients: Number of synthetic patients to generate (default is 10).
@@ -232,9 +348,9 @@ def push_patients(num_patients: int = 10, num_years: int = 1, cohort_id: str = "
     Returns:
         A summary of the operation including successful and failed bundles, patient IDs, and tags applied.
     """
-    if num_patients <= 0:
+    if request.num_patients <= 0:
         return JSONResponse(status_code=400, content={"error": "num_patients must be a positive integer."})
-    if num_years <= 0:
+    if request.num_years <= 0:
         return JSONResponse(status_code=400, content={"error": "num_years must be a positive integer."})
 
     hapi_url = "http://hapi:8080/fhir"
@@ -247,9 +363,15 @@ def push_patients(num_patients: int = 10, num_years: int = 1, cohort_id: str = "
         ret = JSONResponse(status_code=500, content={"error": f"HAPI FHIR server is not reachable. (It may be starting up.)"})
         return ret
 
-    temp_dir, fhir_dir = run_synthea(num_patients, num_years)
+    temp_dir, fhir_dir = run_synthea(
+        request.num_patients, 
+        request.num_years,
+        request.min_age,
+        request.max_age,
+        request.gender
+    )
 
-    tagset = {"urn:charm:cohort": cohort_id, "urn:charm:datatype": "synthetic", "urn:charm:source": "synthea"} 
+    tagset = {"urn:charm:cohort": request.cohort_id, "urn:charm:datatype": "synthetic", "urn:charm:source": "synthea"} 
 
     try:
         # 1. Practitioner and hospital info first
@@ -273,10 +395,10 @@ def push_patients(num_patients: int = 10, num_years: int = 1, cohort_id: str = "
 
 
         try:
-            msg = upsert_group(hapi_url, cohort_id, patient_ids, tagset)
-            results.append({"file": f"group_{cohort_id}", "success": True, "msg": msg})
+            msg = upsert_group(hapi_url, request.cohort_id, patient_ids, tagset)
+            results.append({"file": f"group_{request.cohort_id}", "success": True, "msg": msg})
         except Exception as e:
-            results.append({"file": f"group_{cohort_id}", "success": False, "msg": str(e)})
+            results.append({"file": f"group_{request.cohort_id}", "success": False, "msg": str(e)})
 
         summary = {
             "successful_bundles": sum(1 for r in results if r["success"]),
@@ -288,6 +410,167 @@ def push_patients(num_patients: int = 10, num_years: int = 1, cohort_id: str = "
         return summary
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+@app.get("/patients-and-cohorts", response_class=JSONResponse)
+async def get_patients_and_cohorts():
+    """ Lists all patients stored in the HAPI FHIR server along with their associated cohorts.
+    Returns:
+        A JSON object containing:
+        - patients: A list of patient IDs and their associated cohorts
+        - cohorts: A list of all cohorts and their member counts
+    """
+    # Get the HAPI URL from environment variable
+    hapi_url = os.environ.get('HAPI_URL')
+    if not hapi_url:
+        hapi_url = "http://hapi:8080/fhir"
+        print(f"HAPI_URL not set, using default: {hapi_url}")
+    
+    # Check if the HAPI server is accessible
+    try:
+        r = requests.get(f"{hapi_url}/$meta", timeout=5)
+        r.raise_for_status()
+    except Exception as e:
+        error_msg = f"HAPI FHIR server is not reachable: {str(e)}"
+        print(error_msg)
+        return JSONResponse(
+            status_code=500, 
+            content={"error": error_msg}
+        )
+    
+    try:
+        # Fetch all groups/cohorts
+        print("Fetching groups from HAPI server...")
+        groups = fetch_all_groups(hapi_url)
+        print(f"Found {len(groups)} groups/cohorts")
+        
+        # Create a mapping of patient IDs to cohorts
+        patient_to_cohorts = {}
+        cohort_info = []
+        
+        # Process each group/cohort
+        for group in groups:
+            try:
+                cohort_id = group.get("id")
+                cohort_name = group.get("name", cohort_id)
+                
+                # Get tags if available
+                tags = {}
+                if "meta" in group and "tag" in group["meta"]:
+                    for tag in group["meta"]["tag"]:
+                        if "system" in tag and "code" in tag:
+                            tags[tag["system"]] = tag["code"]
+                
+                # Get members
+                members = []
+                if "member" in group:
+                    for member in group["member"]:
+                        if "entity" in member and "reference" in member["entity"]:
+                            patient_ref = member["entity"]["reference"]
+                            if patient_ref.startswith("Patient/"):
+                                patient_id = patient_ref[8:]  # Remove "Patient/" prefix
+                                members.append(patient_id)
+                                
+                                # Add this cohort to the patient's list of cohorts
+                                if patient_id not in patient_to_cohorts:
+                                    patient_to_cohorts[patient_id] = []
+                                patient_to_cohorts[patient_id].append({
+                                    "cohort_id": cohort_id,
+                                    "cohort_name": cohort_name
+                                })
+                
+                # Add cohort info to the list
+                cohort_info.append({
+                    "cohort_id": cohort_id,
+                    "name": cohort_name,
+                    "member_count": len(members),
+                    "tags": tags
+                })
+            except Exception as e:
+                print(f"Error processing group {group.get('id', 'unknown')}: {str(e)}")
+        
+        # Fetch all patients to ensure we include those not in any cohort
+        print("Fetching patients from HAPI server...")
+        patients = fetch_all_patients(hapi_url)
+        print(f"Found {len(patients)} patients")
+        
+        # Create the final patient list
+        patient_list = []
+        for patient in patients:
+            try:
+                patient_id = patient.get("id")
+                if not patient_id:
+                    continue
+                    
+                # Get patient details
+                name = "Unknown"
+                if "name" in patient and len(patient["name"]) > 0:
+                    name_parts = []
+                    if "given" in patient["name"][0]:
+                        name_parts.extend(patient["name"][0]["given"])
+                    if "family" in patient["name"][0]:
+                        name_parts.append(patient["name"][0]["family"])
+                    if name_parts:
+                        name = " ".join(name_parts)
+                
+                # Get gender and birth date if available
+                gender = patient.get("gender", "unknown")
+                birth_date = patient.get("birthDate", "unknown")
+                
+                # Get cohorts from Group memberships
+                cohorts = patient_to_cohorts.get(patient_id, [])
+                
+                # ALSO check for cohort tags in the patient's metadata
+                if "meta" in patient and "tag" in patient["meta"]:
+                    for tag in patient["meta"]["tag"]:
+                        if tag.get("system") == "urn:charm:cohort":
+                            cohort_id = tag.get("code")
+                            
+                            # Check if this cohort is already in the list
+                            cohort_exists = False
+                            for existing_cohort in cohorts:
+                                if existing_cohort.get("cohort_id") == cohort_id:
+                                    cohort_exists = True
+                                    break
+                            
+                            # If not, add it
+                            if not cohort_exists:
+                                # Try to find the cohort name from our cohort_info list
+                                cohort_name = cohort_id  # Default to ID if name not found
+                                for cohort in cohort_info:
+                                    if cohort.get("cohort_id") == cohort_id:
+                                        cohort_name = cohort.get("name", cohort_id)
+                                        break
+                                
+                                cohorts.append({
+                                    "cohort_id": cohort_id,
+                                    "cohort_name": cohort_name
+                                })
+                
+                # Add to patient list
+                patient_list.append({
+                    "id": patient_id,
+                    "name": name,
+                    "gender": gender,
+                    "birth_date": birth_date,
+                    "cohorts": cohorts
+                })
+            except Exception as e:
+                print(f"Error processing patient {patient.get('id', 'unknown')}: {str(e)}")
+        
+        return {
+            "patients": patient_list,
+            "cohorts": cohort_info,
+            "total_patients": len(patient_list),
+            "total_cohorts": len(cohort_info)
+        }
+    except Exception as e:
+        error_msg = f"Error processing patients and cohorts: {str(e)}"
+        print(error_msg)
+        return JSONResponse(
+            status_code=500, 
+            content={"error": error_msg}
+        )
 
 
 @app.get("/modules", response_class=JSONResponse)

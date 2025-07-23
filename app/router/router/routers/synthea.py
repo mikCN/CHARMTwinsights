@@ -74,3 +74,23 @@ async def get_module_content(module_name: str):
     except httpx.RequestError as e:
         logger.error(f"Error fetching Synthea module {module_name}: {e}")
         raise HTTPException(status_code=500, detail="Synthea server unreachable")
+
+
+@router.get("/patients-and-cohorts", response_class=JSONResponse)
+async def get_patients_and_cohorts():
+    """
+    Get a list of all patients and their associated cohorts from the HAPI FHIR server.
+    """
+    url = f"{settings.synthea_server_url}/patients-and-cohorts"
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            return resp.json()
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Synthea error (patients-and-cohorts): {e.response.text}")
+        detail = e.response.text or "Error fetching patients and cohorts"
+        raise HTTPException(status_code=e.response.status_code, detail=detail)
+    except httpx.RequestError as e:
+        logger.error(f"Error fetching patients and cohorts: {e}")
+        raise HTTPException(status_code=500, detail="Synthea server unreachable")
