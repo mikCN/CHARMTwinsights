@@ -141,49 +141,51 @@ def create_preprocessor(X_train: pd.DataFrame) -> ColumnTransformer:
     """
     logger.info("Creating feature preprocessing pipeline...")
 
-    # Ensure dtypes are correct for proper feature identification
-    # Convert binary/categorical-like ints to category if they should be
-    for col in ['gender', 'race', 'ethnicity', 'sex_at_birth', 'smoking_status', 'alcohol_use', 'obesity', 'diabetes', 'cardiovascular_disease']:
-        if col in X_train.columns:
-            if X_train[col].dtype == 'object': # Already string/object, convert to category
-                X_train[col] = X_train[col].astype('category')
-            elif pd.api.types.is_integer_dtype(X_train[col]) and len(X_train[col].dropna().unique()) <= 2: # Integer 0/1, convert to category
-                X_train[col] = X_train[col].astype('category')
-            # Handle floats that might be binary/categorical but appear float due to NaNs
-            elif pd.api.types.is_float_dtype(X_train[col]) and len(X_train[col].dropna().unique()) <=2 and all(x in [0.0, 1.0] for x in X_train[col].dropna().unique()):
-                X_train[col] = X_train[col].astype('category')
+    # --- NEW ROBUST FEATURE TYPE IDENTIFICATION LOGIC ---
+    final_numeric_features = []
+    final_categorical_features = []
 
+    for col in X_train.columns:
+        # Exclude known non-feature columns that might be present
+        if col in ['person_id', 'time_to_event_days', 'event_observed', 'time_0_dt', 'obs_end_dt', 'actual_outcome_dt']:
+            continue # Skip these internal columns
 
-    numeric_features = X_train.select_dtypes(include=np.number).columns.tolist()
-    categorical_features = X_train.select_dtypes(include=['object', 'category', 'bool']).columns.tolist()
-    
-    # Filter out any non-numeric from numeric_features if they sneaked in,
-    # and ensure boolean is not numeric for these purposes.
-    numeric_features = [f for f in numeric_features if X_train[f].dtype not in ['object', 'category', 'bool']]
-    
-    # Remove any categorical features from numeric_features list that might have been picked up initially
-    numeric_features = [f for f in numeric_features if f not in categorical_features]
+        if pd.api.types.is_numeric_dtype(X_train[col]):
+            # Check if a numeric column is actually binary (0/1) and should be treated as categorical
+            unique_non_nan_values = X_train[col].dropna().unique()
+            if len(unique_non_nan_values) <= 2 and all(val in [0.0, 1.0] for val in unique_non_nan_values):
+                final_categorical_features.append(col) # Treat as categorical (e.g., binary flags)
+            else:
+                final_numeric_features.append(col) # True numeric
+        elif pd.api.types.is_object_dtype(X_train[col]) or pd.api.types.is_categorical_dtype(X_train[col]) or pd.api.types.is_bool_dtype(X_train[col]):
+            final_categorical_features.append(col)
+        # Other column types will be dropped by remainder='drop'
+    # --- END NEW LOGIC ---
 
-
-    if not numeric_features and not categorical_features:
+    if not final_numeric_features and not final_categorical_features:
         logger.warning("No numeric or categorical features identified for preprocessing. Returning a dummy preprocessor.")
         return ColumnTransformer(transformers=[('passthrough', 'passthrough', [])])
 
     numeric_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='mean')),
-        ('outlier_capper', OutlierCapper(lower_bound_quantile=0.01, upper_bound_quantile=0.99)), # This will work on a single Series
+        ('outlier_capper', OutlierCapper(lower_bound_quantile=0.01, upper_bound_quantile=0.99)),
         ('scaler', StandardScaler())
     ])
 
+    # categorical_transformer = Pipeline(steps=[
+    #     ('imputer', SimpleImputer(strategy='most_frequent')),
+    #     ('onehot', OneHotEncoder(handle_unknown='ignore', sparse_output=False, drop='first'))
+    # ])
     categorical_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='most_frequent')),
-        ('onehot', OneHotEncoder(handle_unknown='ignore', sparse_output=False, drop='first')) # <--- ENSURE drop='first' or 'if_binary'
-])
+    ('imputer', SimpleImputer(strategy='most_frequent')),
+    # Change this line:
+    ('onehot', OneHotEncoder(handle_unknown='ignore', sparse_output=False)) # <--- REMOVED drop='first'
+    ])
 
     preprocessor = ColumnTransformer(
         transformers=[
-            ('num', numeric_transformer, numeric_features),
-            ('cat', categorical_transformer, categorical_features)
+            ('num', numeric_transformer, final_numeric_features), # Use the new list
+            ('cat', categorical_transformer, final_categorical_features) # Use the new list
         ],
         remainder='drop' # Explicitly 'drop' columns not handled
     )
@@ -191,6 +193,7 @@ def create_preprocessor(X_train: pd.DataFrame) -> ColumnTransformer:
     preprocessor.fit(X_train) 
     logger.info("Feature preprocessing pipeline created and fitted.")
     return preprocessor
+    
 def apply_preprocessing(
     preprocessor: ColumnTransformer,
     X_train: pd.DataFrame,

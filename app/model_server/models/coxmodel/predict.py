@@ -11,8 +11,8 @@ from sklearn.compose import ColumnTransformer # Keep if your preprocessor uses C
 # --- CONFIGURE THESE PATHS ---
 # ADJUST THESE FILENAMES AND PATHS TO MATCH YOUR EXACT .PKL FILES AND THEIR LOCATION!
 # Using the latest timestamp from your successful run
-MODEL_PATH = "pickled_models/cox_ph_model_20250721_012230.pkl" # <--- UPDATED FILENAME
-PREPROCESSOR_PATH = "pickled_models/preprocessor_20250721_012230.pkl" # <--- UPDATED FILENAME
+MODEL_PATH = "pickled_models/cox_ph_model_20250724_170001.pkl" # <--- UPDATED FILENAME
+PREPROCESSOR_PATH = "pickled_models/preprocessor_20250724_170001.pkl" # <--- UPDATED FILENAME
 
 
 # Global variables to hold the loaded model and preprocessor
