@@ -12,8 +12,8 @@ python = ">=3.10,<3.11" # Matches your Python 3.10
 numpy = "1.26.4"
 lifelines = "0.30.0"
 scikit-learn = "1.6.0" 
-# pyarrow = "20.0.0"      
-# google-cloud-bigquery = "2.34.4" 
+pyarrow = "20.0.0"      
+google-cloud-bigquery = "2.34.4" 
 PyYAML = "6.0.1"        
 [build-system]
 requires = ["poetry-core>=1.0.0"] # Ensure this requirement is met
