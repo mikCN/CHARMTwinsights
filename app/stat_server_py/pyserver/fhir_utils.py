@@ -28,7 +28,7 @@ class FHIRResourceProcessor:
         """
         self.hapi_url = hapi_url.rstrip('/')
         
-    async def fetch_fhir_resources(self, resource_type: str, include_patient: bool = True, count: int = 1000) -> Dict:
+    async def fetch_fhir_resources(self, resource_type: str, include_patient: bool = True, count: int = 1000, cohort_id: str = None) -> Dict:
         """
         Fetch FHIR resources with included patient data.
         
@@ -36,6 +36,7 @@ class FHIRResourceProcessor:
             resource_type: The FHIR resource type to fetch (e.g., 'Condition', 'Procedure', 'Observation')
             include_patient: Whether to include patient resources
             count: Maximum number of resources to fetch
+            cohort_id: Optional cohort ID to filter resources by cohort tag
             
         Returns:
             dict: The FHIR Bundle response
@@ -43,8 +44,20 @@ class FHIRResourceProcessor:
         try:
             logger.info(f"Fetching {resource_type} resources from HAPI FHIR server")
             
-            include_param = f"&_include={resource_type}:patient" if include_patient else ""
-            url = f"{self.hapi_url}/{resource_type}?_count={count}{include_param}"
+            # Build query parameters
+            params = [f"_count={count}"]
+            
+            # Add cohort tag filter if specified
+            if cohort_id:
+                params.append(f"_tag=urn:charm:cohort|{cohort_id}")
+            
+            # Add patient include if needed
+            if include_patient:
+                params.append(f"_include={resource_type}:patient")
+            
+            # Construct URL with all parameters
+            query_string = "&".join(params)
+            url = f"{self.hapi_url}/{resource_type}?{query_string}"
             
             logger.info(f"Making direct FHIR API call to: {url}")
             response = requests.get(url)
@@ -191,7 +204,7 @@ class FHIRResourceProcessor:
                     codes.add(coding['code'])
         return codes
 
-    async def process_fhir_resources(self, resource_type: str, include_patients: bool = True, include_patient_details: bool = True) -> Dict:
+    async def process_fhir_resources(self, resource_type: str, include_patients: bool = True, include_patient_details: bool = True, cohort_id: str = None) -> Dict:
         """
         Process FHIR resources and return a summary.
         
@@ -205,7 +218,7 @@ class FHIRResourceProcessor:
         """
         try:
             # Fetch the resources
-            bundle = await self.fetch_fhir_resources(resource_type, include_patient=include_patient_details)
+            bundle = await self.fetch_fhir_resources(resource_type, include_patient=include_patient_details, cohort_id=cohort_id)
             
             if not bundle or 'entry' not in bundle or not bundle['entry']:
                 logger.info(f"No {resource_type.lower()}s found in the HAPI FHIR server")
@@ -554,13 +567,14 @@ class FHIRResourceProcessor:
             
         return result
     
-    async def visualize_resource(self, resource_type: str, limit: int = 20) -> Response:
+    async def visualize_resource(self, resource_type: str, limit: int = 20, cohort_id: str = None) -> Response:
         """
         Generate a bar chart visualization of the most common resource types.
         
         Args:
             resource_type: Type of resource to visualize ('Condition', 'Procedure', 'Observation')
             limit: Maximum number of items to include
+            cohort_id: Optional cohort ID to filter resources by cohort tag
             
         Returns:
             Response: PNG image of the visualization
@@ -569,7 +583,7 @@ class FHIRResourceProcessor:
             logger.info(f"Generating visualization of {resource_type.lower()}s")
             
             # Get resource data without patient details
-            resource_data = await self.process_fhir_resources(resource_type, include_patients=False)
+            resource_data = await self.process_fhir_resources(resource_type, include_patients=False, cohort_id=cohort_id)
             
             # Prepare data for visualization
             names, counts = self._prepare_visualization_data(resource_data, resource_type, limit)
@@ -605,13 +619,14 @@ class FHIRResourceProcessor:
             logger.error(error_msg, exc_info=True)
             raise HTTPException(status_code=500, detail=error_msg)
             
-    async def visualize_resource_by_gender(self, resource_type: str, limit: int = 10) -> Response:
+    async def visualize_resource_by_gender(self, resource_type: str, limit: int = 10, cohort_id: str = None) -> Response:
         """
         Generate a visualization of resources broken down by gender
         
         Args:
             resource_type: Type of resource ('Condition', 'Procedure', 'Observation')
             limit: Maximum number of items to include per gender
+            cohort_id: Optional cohort ID to filter resources by cohort tag
             
         Returns:
             FastAPI Response with PNG image
@@ -684,7 +699,7 @@ class FHIRResourceProcessor:
                 media_type="text/plain"
             )
             
-    async def visualize_resource_by_age_bracket(self, resource_type: str, limit: int = 10, bracket_size: int = 5) -> Response:
+    async def visualize_resource_by_age_bracket(self, resource_type: str, limit: int = 10, bracket_size: int = 5, cohort_id: str = None) -> Response:
         """
         Generate a visualization of resources broken down by age brackets
         
@@ -692,6 +707,7 @@ class FHIRResourceProcessor:
             resource_type: Type of resource ('Condition', 'Procedure', 'Observation')
             limit: Maximum number of items to include per age bracket
             bracket_size: Size of each age bracket in years
+            cohort_id: Optional cohort ID to filter resources by cohort tag
             
         Returns:
             FastAPI Response with PNG image

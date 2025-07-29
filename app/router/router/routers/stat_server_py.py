@@ -142,13 +142,22 @@ async def proxy_list_all_patient_observations():
 
 
 @router.get("/visualize-observations", response_class=Response)
-async def proxy_visualize_observations(limit: int = Query(20, description="Limit the number of observation types to show")):
+async def proxy_visualize_observations(
+    limit: int = Query(20, description="Limit the number of observation types to show"),
+    cohort_id: str = Query(None, description="Optional cohort ID to filter resources by cohort tag")
+):
     """
     Generates a bar chart visualization of the most common observation types.
     Returns a PNG image of the visualization.
+    
+    Parameters:
+    - limit: Maximum number of observation types to show
+    - cohort_id: Optional cohort ID to filter resources by cohort tag
     """
     url = f"{BACKEND_URL}/visualize-observations"
     params = {"limit": limit}
+    if cohort_id:
+        params["cohort_id"] = cohort_id
     
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:  # Longer timeout for image generation
@@ -165,13 +174,22 @@ async def proxy_visualize_observations(limit: int = Query(20, description="Limit
 
 
 @router.get("/visualize-observations-by-gender", response_class=Response)
-async def proxy_visualize_observations_by_gender(limit: int = Query(10, description="Limit the number of observation types to show per gender")):
+async def proxy_visualize_observations_by_gender(
+    limit: int = Query(10, description="Limit the number of observation types to show per gender"),
+    cohort_id: str = Query(None, description="Optional cohort ID to filter resources by cohort tag")
+):
     """
     Generates a bar chart visualization of the most common observation types broken down by gender.
     Returns a PNG image of the visualization.
+    
+    Parameters:
+    - limit: Maximum number of observation types to show per gender
+    - cohort_id: Optional cohort ID to filter resources by cohort tag
     """
     url = f"{BACKEND_URL}/visualize-observations-by-gender"
     params = {"limit": limit}
+    if cohort_id:
+        params["cohort_id"] = cohort_id
     
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:  # Longer timeout for image generation
@@ -190,14 +208,22 @@ async def proxy_visualize_observations_by_gender(limit: int = Query(10, descript
 @router.get("/visualize-observations-by-age", response_class=Response)
 async def proxy_visualize_observations_by_age(
     limit: int = Query(10, description="Limit the number of observation types to show per age bracket"),
-    bracket_size: int = Query(5, description="Size of each age bracket in years")
+    bracket_size: int = Query(5, description="Size of each age bracket in years"),
+    cohort_id: str = Query(None, description="Optional cohort ID to filter resources by cohort tag")
 ):
     """
     Generates a bar chart visualization of the most common observation types broken down by age brackets.
     Returns a PNG image of the visualization.
+    
+    Parameters:
+    - limit: Maximum number of observation types to show per age bracket
+    - bracket_size: Size of each age bracket in years
+    - cohort_id: Optional cohort ID to filter resources by cohort tag
     """
     url = f"{BACKEND_URL}/visualize-observations-by-age"
     params = {"limit": limit, "bracket_size": bracket_size}
+    if cohort_id:
+        params["cohort_id"] = cohort_id
     
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:  # Longer timeout for image generation
@@ -214,13 +240,22 @@ async def proxy_visualize_observations_by_age(
 
 
 @router.get("/visualize-conditions", response_class=Response)
-async def proxy_visualize_conditions(limit: int = Query(20, description="Limit the number of condition types to show")):
+async def proxy_visualize_conditions(
+    limit: int = Query(20, description="Limit the number of condition types to show"),
+    cohort_id: str = Query(None, description="Optional cohort ID to filter resources by cohort tag")
+):
     """
     Generates a bar chart visualization of the most common condition types.
     Returns a PNG image of the visualization.
+    
+    Parameters:
+    - limit: Maximum number of condition types to show
+    - cohort_id: Optional cohort ID to filter resources by cohort tag
     """
     url = f"{BACKEND_URL}/visualize-conditions"
     params = {"limit": limit}
+    if cohort_id:
+        params["cohort_id"] = cohort_id
     
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:  # Longer timeout for image generation
@@ -237,13 +272,22 @@ async def proxy_visualize_conditions(limit: int = Query(20, description="Limit t
 
 
 @router.get("/visualize-conditions-by-gender", response_class=Response)
-async def proxy_visualize_conditions_by_gender(limit: int = Query(10, description="Limit the number of condition types to show per gender")):
+async def proxy_visualize_conditions_by_gender(
+    limit: int = Query(10, description="Limit the number of condition types to show per gender"),
+    cohort_id: str = Query(None, description="Optional cohort ID to filter resources by cohort tag")
+):
     """
     Generates a bar chart visualization of the most common condition types broken down by gender.
     Returns a PNG image of the visualization.
+    
+    Parameters:
+    - limit: Maximum number of condition types to show per gender
+    - cohort_id: Optional cohort ID to filter resources by cohort tag
     """
     url = f"{BACKEND_URL}/visualize-conditions-by-gender"
     params = {"limit": limit}
+    if cohort_id:
+        params["cohort_id"] = cohort_id
     
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:  # Longer timeout for image generation
@@ -262,14 +306,22 @@ async def proxy_visualize_conditions_by_gender(limit: int = Query(10, descriptio
 @router.get("/visualize-conditions-by-age", response_class=Response)
 async def proxy_visualize_conditions_by_age(
     limit: int = Query(10, description="Limit the number of condition types to show per age bracket"),
-    bracket_size: int = Query(5, description="Size of each age bracket in years")
+    bracket_size: int = Query(5, description="Size of each age bracket in years"),
+    cohort_id: str = Query(None, description="Optional cohort ID to filter resources by cohort tag")
 ):
     """
     Generates a bar chart visualization of the most common condition types broken down by age brackets.
     Returns a PNG image of the visualization.
+    
+    Parameters:
+    - limit: Maximum number of condition types to show per age bracket
+    - bracket_size: Size of each age bracket in years
+    - cohort_id: Optional cohort ID to filter resources by cohort tag
     """
     url = f"{BACKEND_URL}/visualize-conditions-by-age"
     params = {"limit": limit, "bracket_size": bracket_size}
+    if cohort_id:
+        params["cohort_id"] = cohort_id
     
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:  # Longer timeout for image generation
@@ -286,13 +338,22 @@ async def proxy_visualize_conditions_by_age(
 
 
 @router.get("/visualize-procedures", response_class=Response)
-async def proxy_visualize_procedures(limit: int = Query(20, description="Limit the number of procedure types to show")):
+async def proxy_visualize_procedures(
+    limit: int = Query(20, description="Limit the number of procedure types to show"),
+    cohort_id: str = Query(None, description="Optional cohort ID to filter resources by cohort tag")
+):
     """
     Generates a bar chart visualization of the most common procedure types.
     Returns a PNG image of the visualization.
+    
+    Parameters:
+    - limit: Maximum number of procedure types to show
+    - cohort_id: Optional cohort ID to filter resources by cohort tag
     """
     url = f"{BACKEND_URL}/visualize-procedures"
     params = {"limit": limit}
+    if cohort_id:
+        params["cohort_id"] = cohort_id
     
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:  # Longer timeout for image generation
@@ -309,13 +370,22 @@ async def proxy_visualize_procedures(limit: int = Query(20, description="Limit t
 
 
 @router.get("/visualize-procedures-by-gender", response_class=Response)
-async def proxy_visualize_procedures_by_gender(limit: int = Query(10, description="Limit the number of procedure types to show per gender")):
+async def proxy_visualize_procedures_by_gender(
+    limit: int = Query(10, description="Limit the number of procedure types to show per gender"),
+    cohort_id: str = Query(None, description="Optional cohort ID to filter resources by cohort tag")
+):
     """
     Generates a bar chart visualization of the most common procedure types broken down by gender.
     Returns a PNG image of the visualization.
+    
+    Parameters:
+    - limit: Maximum number of procedure types to show per gender
+    - cohort_id: Optional cohort ID to filter resources by cohort tag
     """
     url = f"{BACKEND_URL}/visualize-procedures-by-gender"
     params = {"limit": limit}
+    if cohort_id:
+        params["cohort_id"] = cohort_id
     
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:  # Longer timeout for image generation
@@ -334,14 +404,22 @@ async def proxy_visualize_procedures_by_gender(limit: int = Query(10, descriptio
 @router.get("/visualize-procedures-by-age", response_class=Response)
 async def proxy_visualize_procedures_by_age(
     limit: int = Query(10, description="Limit the number of procedure types to show per age bracket"),
-    bracket_size: int = Query(5, description="Size of each age bracket in years")
+    bracket_size: int = Query(5, description="Size of each age bracket in years"),
+    cohort_id: str = Query(None, description="Optional cohort ID to filter resources by cohort tag")
 ):
     """
     Generates a bar chart visualization of the most common procedure types broken down by age brackets.
     Returns a PNG image of the visualization.
+    
+    Parameters:
+    - limit: Maximum number of procedure types to show per age bracket
+    - bracket_size: Size of each age bracket in years
+    - cohort_id: Optional cohort ID to filter resources by cohort tag
     """
     url = f"{BACKEND_URL}/visualize-procedures-by-age"
     params = {"limit": limit, "bracket_size": bracket_size}
+    if cohort_id:
+        params["cohort_id"] = cohort_id
     
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:  # Longer timeout for image generation

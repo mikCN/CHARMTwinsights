@@ -122,10 +122,19 @@ def fetch_group_by_id(hapi_url, group_id):
         The Group resource as a dictionary if found, None otherwise.
     """
     url = f"{hapi_url.rstrip('/')}/Group/{group_id}"
+    print(f"Fetching group from URL: {url}")
     try:
         r = requests.get(url)
+        print(f"Group fetch response status: {r.status_code}")
         if r.status_code == 200:
-            return r.json()
+            group_data = r.json()
+            print(f"Group data retrieved: ID={group_data.get('id')}, Type={group_data.get('resourceType')}")
+            if 'member' in group_data:
+                print(f"Group has {len(group_data['member'])} members")
+            else:
+                print("Group has no members")
+            return group_data
+        print(f"Failed to fetch group: Status {r.status_code}")
         return None
     except Exception as e:
         print(f"Error fetching group {group_id}: {e}")
@@ -243,7 +252,7 @@ def post_bundle(json_file, hapi_url, tags: dict[str, str] = None): # returns (su
     Returns:
         A tuple (success, message, patient_ids) where:
         - success (bool): True if the post was successful, False otherwise.
-        - message (str): Response text or error message.
+        - message (dict): Response text or detailed error information.
         - patient_ids (set of str): Set of patient IDs found in the bundle, or None if no patients were found.
     """
     patient_ids = set()
@@ -268,19 +277,57 @@ def post_bundle(json_file, hapi_url, tags: dict[str, str] = None): # returns (su
     else:
         url = hapi_url.rstrip("/") + "/Bundle"
     try:
-        r = requests.post(url, json=bundle, headers={"Content-Type": "application/fhir+json"})
+        # Add timeout for large bundles - calculate based on bundle size
+        bundle_size = len(json.dumps(bundle))
+        # 1 second per 10KB with a minimum of 10 seconds and maximum of 120 seconds
+        timeout = max(10, min(120, bundle_size / 10000))
+        print(f"Posting bundle {os.path.basename(json_file)} (size: {bundle_size/1024:.1f}KB) with timeout {timeout:.1f}s")
+        
+        r = requests.post(
+            url, 
+            json=bundle, 
+            headers={"Content-Type": "application/fhir+json"}, 
+            timeout=timeout
+        )
         r.raise_for_status()
-        return True, r.text, patient_ids
+        return True, {"response": r.text}, patient_ids
+    except requests.Timeout:
+        error_info = {
+            "error_type": "timeout",
+            "file_name": os.path.basename(json_file),
+            "bundle_size_kb": round(bundle_size/1024, 1),
+            "timeout_seconds": round(timeout, 1),
+            "message": f"Timeout posting bundle to HAPI server after {timeout} seconds"
+        }
+        print(f"Timeout error: {error_info['message']}")
+        return False, error_info, None
     except requests.HTTPError as e:
-        error_body = r.text if 'r' in locals() else str(e)
-        return False, error_body, None
+        error_body = r.text if 'r' in locals() else "No response body"
+        status_code = r.status_code if 'r' in locals() else "unknown"
+        error_info = {
+            "error_type": "http_error",
+            "file_name": os.path.basename(json_file),
+            "status_code": status_code,
+            "message": f"HTTP error {status_code} posting bundle",
+            "response_body": error_body[:500] if len(error_body) > 500 else error_body
+        }
+        print(f"HTTP error: {error_info['message']}")
+        return False, error_info, None
     except Exception as e:
-        return False, str(e), None
+        error_info = {
+            "error_type": "general_error",
+            "file_name": os.path.basename(json_file),
+            "exception": str(e.__class__.__name__),
+            "message": str(e)
+        }
+        print(f"General error: {error_info['message']}")
+        return False, error_info, None
     
 
 def upsert_group(hapi_url, cohort_id, new_patient_ids, tags):
     """ Upserts a FHIR Group resource with the given cohort ID and patient IDs.
     If the Group already exists, it merges the new patient IDs with existing members.
+    If creating a new Group, adds a creation timestamp tag.
     Args:
         hapi_url: Base URL of the HAPI FHIR server (e.g., http://hapi:8080/fhir).
         cohort_id: The ID of the cohort to create or update.
@@ -293,10 +340,12 @@ def upsert_group(hapi_url, cohort_id, new_patient_ids, tags):
     # Try to fetch existing Group
     url = f"{hapi_url.rstrip('/')}/Group/{cohort_id}"
     existing_ids = set()
+    group_exists = False
     try:
         r = requests.get(url, headers={"Accept": "application/fhir+json"})
         if r.status_code == 200:
             group = r.json()
+            group_exists = True
             for member in group.get("member", []):
                 ref = member.get("entity", {}).get("reference", "")
                 if ref.startswith("Patient/"):
@@ -308,6 +357,10 @@ def upsert_group(hapi_url, cohort_id, new_patient_ids, tags):
 
     # Merge new and existing patient ids
     all_ids = existing_ids | set(new_patient_ids)
+
+    # Get current time in ISO format for the creation timestamp
+    import datetime
+    current_time = datetime.datetime.now().isoformat()
 
     group = {
         "resourceType": "Group",
@@ -323,6 +376,14 @@ def upsert_group(hapi_url, cohort_id, new_patient_ids, tags):
             ]
         }
     }
+    
+    # Add creation timestamp tag if this is a new group
+    if not group_exists:
+        group["meta"]["tag"].append({
+            "system": "urn:charm:created",
+            "code": current_time
+        })
+        print(f"Adding creation timestamp {current_time} to new cohort {cohort_id}")
     if tags:
         apply_tags(group, tags)
     r = requests.put(url, json=group, headers={"Content-Type": "application/fhir+json"})
@@ -373,6 +434,13 @@ def push_patients(request: SyntheaRequest):
 
     tagset = {"urn:charm:cohort": request.cohort_id, "urn:charm:datatype": "synthetic", "urn:charm:source": "synthea"} 
 
+    # Get current time in ISO format for the creation timestamp
+    import datetime
+    current_time = datetime.datetime.now().isoformat()
+    
+    # Add creation timestamp to tagset
+    tagset["urn:charm:created"] = current_time
+    
     try:
         # 1. Practitioner and hospital info first
         special_files = sorted(glob.glob(os.path.join(fhir_dir, "practitionerInformation*.json"))) + \
@@ -383,15 +451,31 @@ def push_patients(request: SyntheaRequest):
         results = []
         # First special files
         for json_file in special_files:
-            success, msg, _ = post_bundle(json_file, hapi_url, tags=tagset)
-            results.append({"file": os.path.basename(json_file), "success": success, "msg": msg})
+            success, error_info, _ = post_bundle(json_file, hapi_url, tags=tagset)
+            results.append({"file": os.path.basename(json_file), "success": success, "msg": error_info})
 
-        # Then patient bundles
+        # Then patient bundles - process in batches for better error handling
         patient_ids = set()
-        for json_file in patient_files:
-            success, msg, new_patient_ids = post_bundle(json_file, hapi_url, tags=tagset)
-            patient_ids.update(new_patient_ids)
-            results.append({"file": os.path.basename(json_file), "success": success, "msg": msg})
+        total_files = len(patient_files)
+        print(f"Processing {total_files} patient files")
+        
+        # Process files in batches to avoid overwhelming the server
+        batch_size = 10  # Process 10 files at a time
+        for i in range(0, total_files, batch_size):
+            batch = patient_files[i:i+batch_size]
+            print(f"Processing batch {i//batch_size + 1}/{(total_files + batch_size - 1)//batch_size} ({len(batch)} files)")
+            
+            for json_file in batch:
+                success, error_info, new_patient_ids = post_bundle(json_file, hapi_url, tags=tagset)
+                if new_patient_ids:
+                    patient_ids.update(new_patient_ids)
+                results.append({"file": os.path.basename(json_file), "success": success, "msg": error_info})
+            
+            # Small delay between batches to give the server a chance to catch up
+            if i + batch_size < total_files:
+                print("Pausing briefly between batches...")
+                import time
+                time.sleep(2)
 
 
         try:
@@ -400,25 +484,42 @@ def push_patients(request: SyntheaRequest):
         except Exception as e:
             results.append({"file": f"group_{request.cohort_id}", "success": False, "msg": str(e)})
 
+        # Collect detailed information about failed bundles
+        failed_bundles = [r for r in results if not r["success"]]
+        failure_details = []
+        
+        for failed in failed_bundles:
+            # Extract the error details
+            error_info = failed.get("msg", {})
+            if isinstance(error_info, dict):
+                failure_details.append(error_info)
+            else:
+                # Handle legacy string error messages
+                failure_details.append({
+                    "file_name": failed.get("file", "unknown"),
+                    "error_type": "unknown",
+                    "message": str(error_info)
+                })
+        
         summary = {
             "successful_bundles": sum(1 for r in results if r["success"]),
             "failed_bundles": sum(1 for r in results if not r["success"]), 
             "patient_ids": list(patient_ids),
             "num_patients": len(patient_ids),
-            "tags_applied": tagset
+            "cohort_id": request.cohort_id,  # Explicitly include the cohort ID in the response
+            "tags_applied": tagset,
+            "failure_details": failure_details if failure_details else None
         }
         return summary
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-@app.get("/patients-and-cohorts", response_class=JSONResponse)
-async def get_patients_and_cohorts():
-    """ Lists all patients stored in the HAPI FHIR server along with their associated cohorts.
+@app.get("/list-all-patients", response_class=JSONResponse)
+async def list_all_patients():
+    """ Lists all patients stored in the HAPI FHIR server with specific demographic information.
     Returns:
-        A JSON object containing:
-        - patients: A list of patient IDs and their associated cohorts
-        - cohorts: A list of all cohorts and their member counts
+        A JSON object containing a list of patients with their IDs, gender, ethnicity, date of birth, and cohort IDs
     """
     # Get the HAPI URL from environment variable
     hapi_url = os.environ.get('HAPI_URL')
@@ -501,68 +602,59 @@ async def get_patients_and_cohorts():
                 patient_id = patient.get("id")
                 if not patient_id:
                     continue
-                    
-                # Get patient details
-                name = "Unknown"
-                if "name" in patient and len(patient["name"]) > 0:
-                    name_parts = []
-                    if "given" in patient["name"][0]:
-                        name_parts.extend(patient["name"][0]["given"])
-                    if "family" in patient["name"][0]:
-                        name_parts.append(patient["name"][0]["family"])
-                    if name_parts:
-                        name = " ".join(name_parts)
                 
-                # Get gender and birth date if available
-                gender = patient.get("gender", "unknown")
+                # Get birth date if available
                 birth_date = patient.get("birthDate", "unknown")
                 
                 # Get cohorts from Group memberships
                 cohorts = patient_to_cohorts.get(patient_id, [])
+                cohort_ids = [c.get("cohort_id") for c in cohorts]
                 
                 # ALSO check for cohort tags in the patient's metadata
                 if "meta" in patient and "tag" in patient["meta"]:
                     for tag in patient["meta"]["tag"]:
                         if tag.get("system") == "urn:charm:cohort":
                             cohort_id = tag.get("code")
-                            
-                            # Check if this cohort is already in the list
-                            cohort_exists = False
-                            for existing_cohort in cohorts:
-                                if existing_cohort.get("cohort_id") == cohort_id:
-                                    cohort_exists = True
-                                    break
-                            
-                            # If not, add it
-                            if not cohort_exists:
-                                # Try to find the cohort name from our cohort_info list
-                                cohort_name = cohort_id  # Default to ID if name not found
-                                for cohort in cohort_info:
-                                    if cohort.get("cohort_id") == cohort_id:
-                                        cohort_name = cohort.get("name", cohort_id)
-                                        break
-                                
-                                cohorts.append({
-                                    "cohort_id": cohort_id,
-                                    "cohort_name": cohort_name
-                                })
+                            if cohort_id not in cohort_ids:
+                                cohort_ids.append(cohort_id)
                 
-                # Add to patient list
-                patient_list.append({
+                # Get gender if available
+                gender = patient.get("gender", "unknown")
+                
+                # Extract ethnicity from extensions
+                ethnicity = "unknown"
+                if "extension" in patient:
+                    for ext in patient["extension"]:
+                        # Look for US Core ethnicity extension
+                        if ext.get("url") == "http://hl7.org/fhir/us/core/StructureDefinition/us-core-ethnicity":
+                            # Extract text representation if available
+                            for nested_ext in ext.get("extension", []):
+                                if nested_ext.get("url") == "text" and "valueString" in nested_ext:
+                                    ethnicity = nested_ext["valueString"]
+                                    break
+                        # Alternative: look for direct ethnicity extension
+                        elif ext.get("url") == "http://hl7.org/fhir/StructureDefinition/patient-ethnicity":
+                            if "valueCodeableConcept" in ext and "text" in ext["valueCodeableConcept"]:
+                                ethnicity = ext["valueCodeableConcept"]["text"]
+                            elif "valueString" in ext:
+                                ethnicity = ext["valueString"]
+                
+                # Add to patient list with only the requested fields
+                patient_info = {
                     "id": patient_id,
-                    "name": name,
                     "gender": gender,
+                    "ethnicity": ethnicity,
                     "birth_date": birth_date,
-                    "cohorts": cohorts
-                })
+                    "cohort_ids": cohort_ids
+                }
+                
+                patient_list.append(patient_info)
             except Exception as e:
                 print(f"Error processing patient {patient.get('id', 'unknown')}: {str(e)}")
         
         return {
             "patients": patient_list,
-            "cohorts": cohort_info,
-            "total_patients": len(patient_list),
-            "total_cohorts": len(cohort_info)
+            "total_patients": len(patient_list)
         }
     except Exception as e:
         error_msg = f"Error processing patients and cohorts: {str(e)}"
@@ -768,6 +860,396 @@ async def get_module_content(module_name: str):
             status_code=500,
             detail=f"Unexpected error: {str(e)}"
         )
+
+@app.get("/list-all-cohorts", response_class=JSONResponse)
+async def list_all_cohorts():
+    """ Lists all cohorts stored in the HAPI FHIR server along with the number of patients in each cohort and their source.
+    Returns:
+        A JSON object containing a list of cohorts with their IDs, patient counts, and sources.
+    """
+    hapi_url = "http://hapi:8080/fhir"
+    
+    # Check if the HAPI server is running
+    try:
+        r = requests.get(hapi_url + "/$meta")
+        r.raise_for_status()
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"HAPI FHIR server is not reachable. (It may be starting up.)"})
+    
+    # Fetch all groups from the HAPI server
+    all_groups = fetch_all_groups(hapi_url)
+    
+    # Process the groups to extract cohort information
+    cohorts = []
+    for group in all_groups:
+        # Extract cohort ID, source, and creation time from tags
+        cohort_id = None
+        source = None
+        creation_time = None
+        
+        # First check if this is a cohort by looking at the ID directly
+        group_id = group.get("id")
+        
+        # Look for cohort information in tags
+        if "meta" in group and "tag" in group["meta"]:
+            for tag in group["meta"]["tag"]:
+                if tag.get("system") == "urn:charm:cohort":
+                    cohort_id = tag.get("code")
+                if tag.get("system") == "urn:charm:source":
+                    source = tag.get("code")
+                if tag.get("system") == "urn:charm:created":
+                    creation_time = tag.get("code")
+                # Also check for datatype tag to identify synthetic cohorts
+                if tag.get("system") == "urn:charm:datatype" and tag.get("code") == "synthetic":
+                    # If we have a synthetic datatype but no cohort ID, use the group ID
+                    if not cohort_id and group_id:
+                        cohort_id = group_id
+                        print(f"Using group ID {group_id} as cohort ID for synthetic cohort")
+        
+        # Skip if this is not a cohort group
+        if not cohort_id:
+            continue
+        
+        # Count the number of patients in the group
+        patient_count = 0
+        if "member" in group:
+            patient_count = len(group["member"])
+        
+        # Add cohort info to the list
+        cohort_info = {
+            "cohort_id": cohort_id,
+            "patient_count": patient_count,
+            "source": source or "unknown"
+        }
+        
+        # Include creation time if available
+        if creation_time:
+            cohort_info["created_at"] = creation_time
+        else:
+            cohort_info["created_at"] = "unknown"
+            
+        cohorts.append(cohort_info)
+    
+    return {
+        "cohorts": cohorts,
+        "total_cohorts": len(cohorts)
+    }
+
+def fetch_complete_patient_data(hapi_url, patient_id=None):
+    """ Fetches complete patient data including all related resources.
+    
+    This function retrieves a patient's complete clinical record by:
+    1. Getting the patient demographic data
+    2. Getting all resources that reference the patient
+    
+    Args:
+        hapi_url: Base URL of the HAPI FHIR server
+        patient_id: Optional specific patient ID to fetch. If None, fetches all patients.
+        
+    Returns:
+        A list of dictionaries, each containing a patient's complete data
+    """
+    try:
+        # First get all patients or a specific patient
+        if patient_id:
+            url = f"{hapi_url}/Patient/{patient_id}"
+            print(f"Fetching patient data from {url}")
+            r = requests.get(url)
+            
+            # Check if patient exists
+            if r.status_code == 404:
+                print(f"Patient with ID {patient_id} not found")
+                return []
+                
+            r.raise_for_status()
+            patients = [r.json()]
+            print(f"Successfully fetched patient {patient_id}")
+        else:
+            patients = fetch_all_patients(hapi_url)
+            print(f"Fetched {len(patients)} patients")
+        
+        complete_patient_data = []
+        
+        # For each patient, get all resources that reference this patient
+        for patient in patients:
+            patient_id = patient.get("id")
+            if not patient_id:
+                print("Skipping patient with no ID")
+                continue
+                
+            print(f"Processing patient {patient_id}")
+            patient_data = {
+                "demographics": patient,
+                "resources": {}
+            }
+            
+            # List of resource types to fetch for each patient
+            resource_types = [
+                "Condition", "Observation", "Procedure", 
+                "MedicationRequest", "MedicationAdministration",
+                "Encounter", "AllergyIntolerance", "Immunization",
+                "DiagnosticReport", "CarePlan", "Claim"
+            ]
+            
+            # Fetch each resource type for this patient
+            for resource_type in resource_types:
+                try:
+                    url = f"{hapi_url}/{resource_type}?patient=Patient/{patient_id}"
+                    r = requests.get(url)
+                    r.raise_for_status()
+                    bundle = r.json()
+                    
+                    if "entry" in bundle:
+                        resources = [entry["resource"] for entry in bundle["entry"]]
+                        patient_data["resources"][resource_type] = resources
+                        print(f"Found {len(resources)} {resource_type} resources for patient {patient_id}")
+                    else:
+                        patient_data["resources"][resource_type] = []
+                        print(f"No {resource_type} resources found for patient {patient_id}")
+                        
+                except Exception as e:
+                    print(f"Error fetching {resource_type} for patient {patient_id}: {e}")
+                    patient_data["resources"][resource_type] = []
+            
+            complete_patient_data.append(patient_data)
+            
+        print(f"Completed processing {len(complete_patient_data)} patients with their resources")
+        return complete_patient_data
+    except Exception as e:
+        print(f"Error in fetch_complete_patient_data: {e}")
+        return []
+
+
+def extract_leaf_keys(data, prefix="", result=None, value_counts=None):
+    """ Recursively extracts all leaf keys from a nested JSON structure and tracks their values.
+    
+    Args:
+        data: The JSON data to extract keys from
+        prefix: Current key prefix for nested structures
+        result: Dictionary to collect key counts
+        value_counts: Dictionary to collect value frequencies for each key
+        
+    Returns:
+        Tuple of (key_counts, value_counts) where:
+        - key_counts is a dictionary with leaf keys as keys and their counts as values
+        - value_counts is a dictionary with leaf keys as keys and a Counter of their values as values
+    """
+    if result is None:
+        result = {}
+    if value_counts is None:
+        value_counts = {}
+        
+    if isinstance(data, dict):
+        for key, value in data.items():
+            new_prefix = f"{prefix}.{key}" if prefix else key
+            if isinstance(value, (dict, list)):
+                extract_leaf_keys(value, new_prefix, result, value_counts)
+            else:
+                # Count the key
+                if new_prefix in result:
+                    result[new_prefix] += 1
+                else:
+                    result[new_prefix] = 1
+                
+                # Track the value
+                str_value = str(value)[:100]  # Truncate very long values
+                if new_prefix not in value_counts:
+                    value_counts[new_prefix] = {}
+                if str_value in value_counts[new_prefix]:
+                    value_counts[new_prefix][str_value] += 1
+                else:
+                    value_counts[new_prefix][str_value] = 1
+    elif isinstance(data, list):
+        for i, item in enumerate(data):
+            if isinstance(item, (dict, list)):
+                extract_leaf_keys(item, prefix, result, value_counts)
+                
+    return result, value_counts
+
+
+@app.get("/count-patient-keys", response_class=JSONResponse)
+async def count_patient_keys(cohort_id: str = None):
+    """ Counts the occurrence of leaf keys in patient JSON data including all related resources.
+    
+    Args:
+        cohort_id: Optional ID of the cohort to analyze. If not provided, all patients are analyzed.
+        
+    Returns:
+        A JSON object containing counts of leaf keys across all patients in the specified cohort or all patients,
+        along with the 3 most common values for each key.
+    """
+    hapi_url = "http://hapi:8080/fhir"
+    
+    # Check if the HAPI server is running
+    try:
+        r = requests.get(hapi_url + "/$meta")
+        r.raise_for_status()
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"HAPI FHIR server is not reachable. (It may be starting up.)"})
+    
+    # If cohort_id is provided, get patient IDs with the cohort tag
+    patient_ids = None
+    if cohort_id:
+        # Query for patients with the specific cohort tag
+        cohort_tag = f"urn:charm:cohort|{cohort_id}"
+        print(f"Searching for patients with tag: {cohort_tag}")
+        
+        try:
+            # Use _tag parameter to find patients with this cohort tag
+            url = f"{hapi_url}/Patient?_tag={cohort_tag}&_count=1000"
+            print(f"Querying URL: {url}")
+            r = requests.get(url)
+            r.raise_for_status()
+            bundle = r.json()
+            
+            # Extract patient IDs from the bundle
+            patient_ids = []
+            if "entry" in bundle:
+                for entry in bundle["entry"]:
+                    if "resource" in entry and entry["resource"].get("resourceType") == "Patient":
+                        patient_id = entry["resource"].get("id")
+                        if patient_id:
+                            patient_ids.append(patient_id)
+            
+            print(f"Found {len(patient_ids)} patients with cohort tag '{cohort_id}'")
+            print(f"Patient IDs in cohort: {patient_ids[:5]}{'...' if len(patient_ids) > 5 else ''}")
+            
+            # If cohort is empty, return early
+            if not patient_ids:
+                return {
+                    "total_patients": 0,
+                    "cohort_id": cohort_id,
+                    "key_analysis": {}
+                }
+        except Exception as e:
+            print(f"Error retrieving patients for cohort '{cohort_id}': {e}")
+            return JSONResponse(status_code=500, content={"error": f"Error retrieving patients for cohort '{cohort_id}': {str(e)}"})
+    
+    # Get complete patient data for all patients or filtered by cohort
+    print(f"Fetching complete patient data...")
+    all_patient_data = []
+    
+    if cohort_id and patient_ids:
+        print(f"Analyzing {len(patient_ids)} patients in cohort '{cohort_id}'")
+        print(f"Patient IDs in cohort: {patient_ids[:5]}{'...' if len(patient_ids) > 5 else ''}")
+        
+        # Process patients in batches to avoid overloading the server
+        batch_size = 5  # Process 5 patients at a time
+        
+        for i in range(0, len(patient_ids), batch_size):
+            batch = patient_ids[i:i+batch_size]
+            print(f"Processing batch {i//batch_size + 1}/{(len(patient_ids) + batch_size - 1)//batch_size}")
+            
+            for patient_id in batch:
+                # Fetch complete data for this patient
+                print(f"Fetching data for patient {patient_id}")
+                patient_data = fetch_complete_patient_data(hapi_url, patient_id)
+                print(f"Patient {patient_id} data retrieved: {bool(patient_data)} (length: {len(patient_data) if patient_data else 0})")
+                if patient_data:  # Make sure we got data back
+                    all_patient_data.extend(patient_data)
+    else:
+        # For all patients, we'll use a different approach to avoid memory issues
+        # First get basic patient data
+        all_patients = fetch_all_patients(hapi_url)
+        print(f"Retrieved {len(all_patients)} patients for key analysis")
+        
+        # Process patients in batches
+        batch_size = 5
+        
+        for i in range(0, len(all_patients), batch_size):
+            batch = all_patients[i:i+batch_size]
+            print(f"Processing batch {i//batch_size + 1}/{(len(all_patients) + batch_size - 1)//batch_size}")
+            
+            for patient in batch:
+                patient_id = patient.get("id")
+                if patient_id:
+                    print(f"Fetching data for patient {patient_id}")
+                    patient_data = fetch_complete_patient_data(hapi_url, patient_id)
+                    if patient_data:  # Make sure we got data back
+                        all_patient_data.extend(patient_data)
+    
+    print(f"Retrieved complete data for {len(all_patient_data)} patients")
+    
+    # Count leaf keys and track values across all patients
+    all_keys = {}
+    all_values = {}
+    
+    for patient_data in all_patient_data:
+        # Extract keys and values from patient demographics
+        demographics_keys, demographics_values = extract_leaf_keys(patient_data["demographics"], prefix="demographics")
+        
+        # Update key counts
+        for key, count in demographics_keys.items():
+            if key in all_keys:
+                all_keys[key] += 1
+            else:
+                all_keys[key] = 1
+        
+        # Update value counts
+        for key, values in demographics_values.items():
+            if key not in all_values:
+                all_values[key] = {}
+            
+            for value, count in values.items():
+                if value in all_values[key]:
+                    all_values[key][value] += count
+                else:
+                    all_values[key][value] = count
+        
+        # Extract keys and values from each resource type
+        for resource_type, resources in patient_data["resources"].items():
+            for resource in resources:
+                resource_keys, resource_values = extract_leaf_keys(resource, prefix=f"resources.{resource_type}")
+                
+                # Update key counts
+                for key, count in resource_keys.items():
+                    if key in all_keys:
+                        all_keys[key] += 1
+                    else:
+                        all_keys[key] = 1
+                
+                # Update value counts
+                for key, values in resource_values.items():
+                    if key not in all_values:
+                        all_values[key] = {}
+                    
+                    for value, count in values.items():
+                        if value in all_values[key]:
+                            all_values[key][value] += count
+                        else:
+                            all_values[key][value] = count
+    
+    # Create result with key counts and top values
+    result = {}
+    for key, count in all_keys.items():
+        # Get the top 3 most common values for this key
+        top_values = ""
+        if key in all_values:
+            # Sort values by frequency (descending)
+            sorted_values = sorted(all_values[key].items(), key=lambda item: item[1], reverse=True)
+            
+            # Take top 3
+            top_3 = sorted_values[:3]
+            
+            if top_3:
+                value_strings = [f"{value} - {count} occurrences" for value, count in top_3]
+                top_values = "3 most common values: " + ", ".join(value_strings)
+        
+        # Add to result
+        result[key] = {
+            "count": count,
+            "top_values": top_values
+        }
+    
+    # Sort keys by frequency (descending)
+    sorted_result = dict(sorted(result.items(), key=lambda item: item[1]["count"], reverse=True))
+    
+    return {
+        "total_patients": len(all_patient_data),
+        "cohort_id": cohort_id if cohort_id else "all",
+        "key_analysis": sorted_result
+    }
+
 
 if __name__ == "__main__":
     import uvicorn
