@@ -5,7 +5,7 @@ services:
   router:
     build: ./router
     ports:
-      - "80:8000"
+      - "8000:8000"
     depends_on:
       - stat_server_py
       #- stat_server_r

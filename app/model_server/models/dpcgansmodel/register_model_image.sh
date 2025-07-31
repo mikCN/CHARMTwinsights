@@ -1,8 +1,9 @@
 #!/bin/bash
 
+APP_PORT=${APP_PORT:-8000}
 
 echo -e "Pushing dpcgans model to the model server...\n"
-curl -X POST "http://localhost/modeling/models" \
+curl -X POST "http://localhost:$APP_PORT/modeling/models" \
   -H "Content-Type: application/json" \
   -d '{
     "image": "dpcgansmodel:latest",
