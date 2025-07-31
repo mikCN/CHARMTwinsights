@@ -1,12 +1,15 @@
 # Use an official lightweight Python image.
 FROM python:3.13-slim
 
-# Install system dependencies, including libmagic.
+# Install system dependencies, including libmagic and matplotlib dependencies
 RUN apt-get update && apt-get install -y \
     curl \
     build-essential \
     libmagic1 \
     file \
+    libfreetype6-dev \
+    libpng-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Poetry.
