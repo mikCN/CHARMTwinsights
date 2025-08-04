@@ -1,5 +1,8 @@
 #!/bin/bash
 
+APP_PORT=${APP_PORT:-8000}
+
+
 # List of cohort IDs (space-separated)
 cohort_ids=("cohort1" "cohort2" "cohort1")
 
@@ -7,7 +10,7 @@ for cohort_id in "${cohort_ids[@]}"; do
   echo "Processing cohort_id: $cohort_id"
   while true; do
     # Capture body and status code
-    response=$(curl -s -w "\n%{http_code}" -X POST "http://localhost/synthetic/synthea/generate-synthetic-patients?num_patients=3&num_years=1&cohort_id=$cohort_id")
+    response=$(curl -s -w "\n%{http_code}" -X POST "http://localhost:$APP_PORT/synthetic/synthea/generate-synthetic-patients?num_patients=3&num_years=1&cohort_id=$cohort_id")
     # The last line is the HTTP status code
     http_code=$(echo "$response" | tail -n1)
     # Everything before is the body

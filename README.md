@@ -99,7 +99,7 @@ docker compose up --detach
 
 This starts all services in the application in a 'detached' state; subsequent docker compose commands (e.g. `docker compose logs`, `docker compose down`) can be used for management. 
 
-The main API endpoints will be browsable at [`http://localhost/docs`](http://localhost/docs).
+The main API endpoints will be browsable at [`http://localhost:8000/docs`](http://localhost:8000/docs).
 
 ### 4. Load Models
 
@@ -116,7 +116,7 @@ Each model will be tested with the example inputs, returning the generated resul
 
 ### 5. Generate Synthetic Data
 
-Synthetic patient data in FHIR format may be generated via a POST request to http://localhost/synthetic/synthea/generate-synthetic-patients, with url parameters `num_patients`, `num_years`, 
+Synthetic patient data in FHIR format may be generated via a POST request to http://localhost:8000/synthetic/synthea/generate-synthetic-patients, with url parameters `num_patients`, `num_years`, 
 and `cohort_id`. The patients will be simulated with Synthea, and their records will be tagged with the provided `cohort_id` (defaulting to `default`).
 
 It is possible to re-use the same cohort ID across multiple generations, in which case newly generated patients will be added to the cohort.
@@ -132,7 +132,7 @@ These data are pushed to the FHIR server accessible at `http://localhost:8080` f
 
 ### 6. Test Models
 
-Predictive model capabilities are accessed under endpoints at `http://localhost/modeling`. Example CURLs are available via script:
+Predictive model capabilities are accessed under endpoints at `http://localhost:8000/modeling`. Example CURLs are available via script:
 
 ```bash
 # working dir: app
@@ -143,7 +143,7 @@ As above, skip if you are not developing or using models.
 
 ### 7. Test Analytics
 
-Summary statistics about generated patient data are available under endpoints at `http://localhost/stats`. Examples CURLs are available via script:
+Summary statistics about generated patient data are available under endpoints at `http://localhost:8000/stats`. Examples CURLs are available via script:
 
 ```bash
 # working dir: app
@@ -183,7 +183,7 @@ As noted above, FHIR data stored in the HAPI server is persisted across runs; th
 
 For development purposes, each service is exposed to the localhost on independent ports (applied automatically via `app/docker-compose.override.yaml`):
 
-- router: localhost:80
+- router: localhost:8000
 - hapi: localhost:8080
 - stat_server_py: localhost:8001
 - stat_server_r: localhost:8002

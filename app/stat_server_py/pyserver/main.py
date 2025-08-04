@@ -1,11 +1,26 @@
 import os
 import requests
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-import pandas as pd
-from fhiry.fhirsearch import Fhirsearch
+import json
 import logging
+import io
+import base64
+import numpy as np
+import pandas as pd
+
+# FastAPI imports
+from fastapi import FastAPI, HTTPException, Query, Path
+from fastapi.responses import JSONResponse, Response
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Optional, Dict, Any
+
+# FHIR imports
+from fhiry import Fhirsearch
+
+# Matplotlib for visualization
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
+import matplotlib.pyplot as plt
 
 logging.basicConfig(level=logging.INFO, 
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -130,6 +145,192 @@ async def get_conditions(
 # same works for Conditions, Observations, etc.
 # given a list of Patient IDs (from above), we can also get all Conditions for those patients
 # {settings.hapi_url}/Condition?subject=Patient/123,Patient/456
+
+
+
+# Import the FHIR utilities
+from .fhir_utils import FHIRResourceProcessor
+
+# Create a FHIR resource processor instance
+fhir_processor = None
+
+@app.on_event("startup")
+async def startup_event():
+    global fhir_processor
+    fhir_processor = FHIRResourceProcessor(settings.hapi_url)
+
+@app.get("/list-all-patient-conditions", response_class=JSONResponse)
+async def list_all_patient_conditions():
+    """
+    Lists all conditions from all patients in the HAPI FHIR server.
+    Returns a summary of conditions with their counts and associated patient details.
+    """
+    return await fhir_processor.process_fhir_resources('Condition', include_patients=True, include_patient_details=True)
+
+@app.get("/list-all-patient-procedures", response_class=JSONResponse)
+async def list_all_patient_procedures():
+    """
+    Lists all procedures from all patients in the HAPI FHIR server.
+    Returns a summary of procedures with their counts and associated patient details.
+    """
+    return await fhir_processor.process_fhir_resources('Procedure', include_patients=True, include_patient_details=True)
+
+@app.get("/list-all-patient-observations", response_class=JSONResponse)
+async def list_all_patient_observations():
+    """
+    Lists all observations from all patients in the HAPI FHIR server.
+    Returns a summary of observations with their counts and associated patient details.
+    """
+    return await fhir_processor.process_fhir_resources('Observation', include_patients=True, include_patient_details=True)
+
+@app.get("/visualize-observations", response_class=Response)
+async def visualize_observations(
+    limit: int = Query(20, description="Limit the number of observation types to show"),
+    cohort_id: str = Query(None, description="Optional cohort ID to filter resources by cohort tag")
+):
+    """
+    Generates a bar chart visualization of the most common observation types.
+    Returns a PNG image of the visualization.
+    
+    Parameters:
+    - limit: Maximum number of observation types to show
+    - cohort_id: Optional cohort ID to filter resources by cohort tag
+    """
+    return await fhir_processor.visualize_resource('Observation', limit, cohort_id)
+
+
+@app.get("/visualize-observations-by-gender", response_class=Response)
+async def visualize_observations_by_gender(
+    limit: int = Query(10, description="Limit the number of observation types to show per gender"),
+    cohort_id: str = Query(None, description="Optional cohort ID to filter resources by cohort tag")
+):
+    """
+    Generates a bar chart visualization of the most common observation types broken down by gender.
+    Returns a PNG image of the visualization.
+    
+    Parameters:
+    - limit: Maximum number of observation types to show per gender
+    - cohort_id: Optional cohort ID to filter resources by cohort tag
+    """
+    return await fhir_processor.visualize_resource_by_gender('Observation', limit, cohort_id)
+
+
+@app.get("/visualize-observations-by-age", response_class=Response)
+async def visualize_observations_by_age(
+    limit: int = Query(10, description="Limit the number of observation types to show per age bracket"),
+    bracket_size: int = Query(5, description="Size of each age bracket in years"),
+    cohort_id: str = Query(None, description="Optional cohort ID to filter resources by cohort tag")
+):
+    """
+    Generates a bar chart visualization of the most common observation types broken down by age brackets.
+    Returns a PNG image of the visualization.
+    
+    Parameters:
+    - limit: Maximum number of observation types to show per age bracket
+    - bracket_size: Size of each age bracket in years
+    - cohort_id: Optional cohort ID to filter resources by cohort tag
+    """
+    return await fhir_processor.visualize_resource_by_age_bracket('Observation', limit, bracket_size, cohort_id)
+
+
+@app.get("/visualize-conditions", response_class=Response)
+async def visualize_conditions(
+    limit: int = Query(20, description="Limit the number of condition types to show"),
+    cohort_id: str = Query(None, description="Optional cohort ID to filter resources by cohort tag")
+):
+    """
+    Generates a bar chart visualization of the most common condition types.
+    Returns a PNG image of the visualization.
+    
+    Parameters:
+    - limit: Maximum number of condition types to show
+    - cohort_id: Optional cohort ID to filter resources by cohort tag
+    """
+    return await fhir_processor.visualize_resource('Condition', limit, cohort_id)
+
+
+@app.get("/visualize-conditions-by-gender", response_class=Response)
+async def visualize_conditions_by_gender(
+    limit: int = Query(10, description="Limit the number of condition types to show per gender"),
+    cohort_id: str = Query(None, description="Optional cohort ID to filter resources by cohort tag")
+):
+    """
+    Generates a bar chart visualization of the most common condition types broken down by gender.
+    Returns a PNG image of the visualization.
+    
+    Parameters:
+    - limit: Maximum number of condition types to show per gender
+    - cohort_id: Optional cohort ID to filter resources by cohort tag
+    """
+    return await fhir_processor.visualize_resource_by_gender('Condition', limit, cohort_id)
+
+
+@app.get("/visualize-conditions-by-age", response_class=Response)
+async def visualize_conditions_by_age(
+    limit: int = Query(10, description="Limit the number of condition types to show per age bracket"),
+    bracket_size: int = Query(5, description="Size of each age bracket in years"),
+    cohort_id: str = Query(None, description="Optional cohort ID to filter resources by cohort tag")
+):
+    """
+    Generates a bar chart visualization of the most common condition types broken down by age brackets.
+    Returns a PNG image of the visualization.
+    
+    Parameters:
+    - limit: Maximum number of condition types to show per age bracket
+    - bracket_size: Size of each age bracket in years
+    - cohort_id: Optional cohort ID to filter resources by cohort tag
+    """
+    return await fhir_processor.visualize_resource_by_age_bracket('Condition', limit, bracket_size, cohort_id)
+
+
+@app.get("/visualize-procedures", response_class=Response)
+async def visualize_procedures(
+    limit: int = Query(20, description="Limit the number of procedure types to show"),
+    cohort_id: str = Query(None, description="Optional cohort ID to filter resources by cohort tag")
+):
+    """
+    Generates a bar chart visualization of the most common procedure types.
+    Returns a PNG image of the visualization.
+    
+    Parameters:
+    - limit: Maximum number of procedure types to show
+    - cohort_id: Optional cohort ID to filter resources by cohort tag
+    """
+    return await fhir_processor.visualize_resource('Procedure', limit, cohort_id)
+
+
+@app.get("/visualize-procedures-by-gender", response_class=Response)
+async def visualize_procedures_by_gender(
+    limit: int = Query(10, description="Limit the number of procedure types to show per gender"),
+    cohort_id: str = Query(None, description="Optional cohort ID to filter resources by cohort tag")
+):
+    """
+    Generates a bar chart visualization of the most common procedure types broken down by gender.
+    Returns a PNG image of the visualization.
+    
+    Parameters:
+    - limit: Maximum number of procedure types to show per gender
+    - cohort_id: Optional cohort ID to filter resources by cohort tag
+    """
+    return await fhir_processor.visualize_resource_by_gender('Procedure', limit, cohort_id)
+
+
+@app.get("/visualize-procedures-by-age", response_class=Response)
+async def visualize_procedures_by_age(
+    limit: int = Query(10, description="Limit the number of procedure types to show per age bracket"),
+    bracket_size: int = Query(5, description="Size of each age bracket in years"),
+    cohort_id: str = Query(None, description="Optional cohort ID to filter resources by cohort tag")
+):
+    """
+    Generates a bar chart visualization of the most common procedure types broken down by age brackets.
+    Returns a PNG image of the visualization.
+    
+    Parameters:
+    - limit: Maximum number of procedure types to show per age bracket
+    - bracket_size: Size of each age bracket in years
+    - cohort_id: Optional cohort ID to filter resources by cohort tag
+    """
+    return await fhir_processor.visualize_resource_by_age_bracket('Procedure', limit, bracket_size, cohort_id)
 
 
 if __name__ == "__main__":
