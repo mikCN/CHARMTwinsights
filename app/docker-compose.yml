@@ -2,6 +2,13 @@
 # docker-compose.override.yaml does, and is included by default in docker-compose commands
 
 services:
+
+
+  vueapp:
+    build: ./vueapp
+    depends_on:
+      - router
+
   router:
     build: ./router
     ports:
