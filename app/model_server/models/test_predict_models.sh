@@ -12,11 +12,11 @@ curl -X POST http://localhost:$APP_PORT/modeling/predict \
   -H "Content-Type: application/json" \
   -d '{"image": "dpcgansmodel:latest", "input": [{"num_rows": 3, "max_retries": 100, "max_rows_multiplier": 10, "float_rtol": 0.01, "graceful_reject_sampling": false}]}'
 
-echo -e "\n--- Testing coxmodel prediction endpoint:\n"
-curl -X POST "http://localhost/modeling/predict" \
+echo -e "\n--- Testing coxcopdmodel prediction endpoint:\n"
+curl -X POST http://localhost:$APP_PORT/modeling/predict \
   -H "Content-Type: application/json" \
   -d '{
-    "image": "cox-model-prediction-app:latest",
+    "image": "coxcopdmodel:latest",
     "input": [
       {
         "ethnicity": "Not Hispanic or Latino", 

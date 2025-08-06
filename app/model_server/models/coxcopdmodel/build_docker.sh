@@ -5,7 +5,7 @@
 
 
 TAGS=(
-  "coxmodel:latest"
+  "coxcopdmodel:latest"
 )
 
 args="$@"
