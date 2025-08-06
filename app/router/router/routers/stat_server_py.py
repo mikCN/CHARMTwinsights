@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Query, Path, Request, Response
 from fastapi.responses import JSONResponse
 import httpx
 import logging
+from typing import List, Optional
 
 from ..config import settings
 
@@ -13,6 +14,7 @@ router = APIRouter(
 )
 
 BACKEND_URL = settings.stat_server_py_url.rstrip("/")
+HAPI_URL = settings.hapi_server_url.rstrip("/")
 
 @router.get("/patients", response_class=JSONResponse)
 async def proxy_get_patients(
@@ -55,6 +57,67 @@ async def proxy_get_patient_by_id(
     except httpx.RequestError as e:
         logger.error(f"Error contacting backend: {e}")
         raise HTTPException(status_code=500, detail="stat_server_py unreachable")
+
+@router.get("/patients/{patient_id}/$everything")
+async def patient_everything(
+    patient_id: str = Path(..., description="The FHIR Patient resource ID."),
+    start: Optional[str] = Query(
+        None,
+        description=(
+            "Care date start (inclusive). Format: YYYY, YYYY-MM, YYYY-MM-DD, or YYYY-MM-DDThh:mm:ss+zz:zz"
+        ),
+        example="2018-01-01"
+    ),
+    end: Optional[str] = Query(
+        None,
+        description=(
+            "Care date end (inclusive). Format: YYYY, YYYY-MM, YYYY-MM-DD, or YYYY-MM-DDThh:mm:ss+zz:zz"
+        ),
+        example="2020-12-31"
+    ),
+    _since: Optional[str] = Query(
+        None,
+        description="Return resources updated after this instant. Format: YYYY-MM-DDThh:mm:ss+zz:zz or similar.",
+        example="2022-01-01T00:00:00Z"
+    ),
+    _type: Optional[List[str]] = Query(
+        None,
+        description="Comma-delimited FHIR resource types to include. Example: Observation,Condition",
+        example=["Observation", "Condition"]
+    ),
+    _count: Optional[int] = Query(
+        None,
+        description="Page size for results (see HAPI docs)."
+    ),
+):
+    """Wraps the hapi:/fhir/Patient/{id}/$everything endpoint to fetch all resources related to a patient. See https://hl7.org/fhir/operation-patient-everything.html"""
+    # Construct query params for the backend
+    query_params = {}
+    if start:
+        query_params['start'] = start
+    if end:
+        query_params['end'] = end
+    if _since:
+        query_params['_since'] = _since
+    if _type:
+        # FHIR allows comma-separated or multiple _type params
+        # We'll join as comma-separated for simplicity
+        query_params['_type'] = ",".join(_type)
+    if _count is not None:
+        query_params['_count'] = str(_count)
+
+    backend_url = f"{HAPI_URL}/Patient/{patient_id}/$everything"
+
+    # Forward the request to HAPI
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(backend_url, params=query_params)
+        if resp.status_code >= 400:
+            raise HTTPException(status_code=resp.status_code, detail=resp.text)
+        return Response(
+            content=resp.content,
+            status_code=resp.status_code,
+            media_type=resp.headers.get("content-type", "application/fhir+json"),
+        )
 
 @router.get("/conditions", response_class=JSONResponse)
 async def proxy_get_conditions(

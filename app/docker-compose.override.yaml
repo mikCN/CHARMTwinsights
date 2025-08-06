@@ -22,3 +22,7 @@ services:
   model_server:
     ports:
       - "8004:8000"
+
+  vueapp:
+    ports:
+      - "8005:80"
