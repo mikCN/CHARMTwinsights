@@ -38,11 +38,4 @@ COPY predict ./
 # Make the 'predict' shell script executable
 RUN chmod +x predict
 
-# --- CRITICAL LINE: Set the ENTRYPOINT to your executable shell script ---
-# This ensures that '/app/predict' is always executed, and any arguments
-# passed to 'docker run' (like /app/input.json) are passed to '/app/predict'.
-ENTRYPOINT ["/app/predict"] 
-
-# CMD is not strictly needed if ENTRYPOINT is used and arguments are always passed by 'docker run'.
-# If you wanted a default argument, you'd set it as CMD ["/app/input.json"]
-# but for now, we expect the user to pass it.
+# no entrypoint or cmd, that will be handled by the model server

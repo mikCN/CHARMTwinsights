@@ -2,7 +2,7 @@
 
 
 echo -e "Registering Cox PH model to the model server...\n"
-curl -X POST "http://localhost/modeling/models" \
+curl -X POST "http://localhost:8000/modeling/models" \
   -H "Content-Type: application/json" \
   -d '{
     "image": "coxmodel:latest",
