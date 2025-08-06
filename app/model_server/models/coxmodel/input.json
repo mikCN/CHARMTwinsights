@@ -1,0 +1,35 @@
+[
+  {
+    "ethnicity": "Not Hispanic or Latino", 
+    "sex_at_birth": "Male", 
+    "obesity": 1.0,  
+    "diabetes": 1.0,  
+    "cardiovascular_disease": 1.0, 
+    "smoking_status": 0.0, 
+    "alcohol_use": 1.0, 
+    "bmi": 25.0, 
+    "age_at_time_0": 50.0
+  },
+  {
+    "ethnicity": "PMI: Prefer Not To Answer", 
+    "sex_at_birth": "Male", 
+    "obesity": 1.0, 
+    "diabetes": 1.0, 
+    "cardiovascular_disease": 1.0, 
+    "smoking_status": 0.0, 
+    "alcohol_use": 1.0, 
+    "bmi": 32.0, 
+    "age_at_time_0": 65.0
+  },
+  {
+    "ethnicity": "What Race Ethnicity: Race Ethnicity None Of These", 
+    "sex_at_birth": "Male", 
+    "obesity": 1.0, 
+    "diabetes": 1.0, 
+    "cardiovascular_disease": 1.0, 
+    "smoking_status": 0.0, 
+    "alcohol_use": 1.0, 
+    "bmi": 28.0, 
+    "age_at_time_0": 45.0
+  }
+]
