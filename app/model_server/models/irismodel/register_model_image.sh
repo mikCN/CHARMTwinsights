@@ -1,0 +1,30 @@
+#!/bin/bash
+
+APP_PORT=${APP_PORT:-8000}
+
+echo -e "\n\nPushing iris model to the model server...\n"
+curl -X POST "http://localhost:$APP_PORT/modeling/models" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "image": "irismodel:latest",
+    "title": "Iris Dataset Model",
+    "short_description": "A model for predicting iris species based on features.",
+    "authors": "John Doe, Jane Smith",
+    "examples": [
+      {
+        "sepal length (cm)": 5.1,
+        "sepal width (cm)": 3.5,
+        "petal length (cm)": 1.4,
+        "petal width (cm)": 0.2
+      },
+      {
+        "sepal length (cm)": 7.0,
+        "sepal width (cm)": 3.2,
+        "petal length (cm)": 4.7,
+        "petal width (cm)": 1.4
+      }    
+    ],
+    "readme": "## IrisModel\nThis model predicts the species of iris flowers based on their sepal and petal dimensions. It is trained on the classic Iris dataset and can classify iris species into three categories: Setosa, Versicolor, and Virginica."
+  }'
+
+echo -e "\n"

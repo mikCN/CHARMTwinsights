@@ -1,0 +1,28 @@
+# note that 'ports' makes these services available to the host on hostpost:containerport
+# later we will want to keep them private via docker 'expose' and just publish specific container ports with 'ports'
+
+services:
+
+  stat_server_py:
+    ports:
+      - "8001:8000"
+
+  stat_server_r:
+    ports:
+      - "8002:8000"
+
+  hapi:
+    ports:
+      - "8080:8080"
+
+  synthea_server:
+    ports:
+      - "8003:8000"
+
+  model_server:
+    ports:
+      - "8004:8000"
+
+  vueapp:
+    ports:
+      - "8005:80"

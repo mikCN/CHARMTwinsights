@@ -1,0 +1,8 @@
+Package: rserver
+Title: rserver API using plumber
+Version: 0.1.0
+Authors@R: person("Your", "Name", email = "you@example.com", role = c("aut", "cre"))
+Description: An R REST API for CHARMTwinsight.
+License: MIT
+Encoding: UTF-8
+LazyData: true

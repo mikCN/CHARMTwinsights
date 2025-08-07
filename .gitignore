@@ -19,6 +19,11 @@ Thumbs.db
 .ipynb_checkpoints
 
 # Large files and directories (e.g., Synthea-generated data)
-Downloads/synthea_output/
-*.jar
-data/20_synthetic_data_patients_example.zip
+tools/output/
+app/hapi/postgres_data/
+scripts/mimic_data/
+
+# rstudio stuff
+*.Rproj*
+
+

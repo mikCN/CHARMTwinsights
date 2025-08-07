@@ -1,0 +1,20 @@
+[project]
+name = "dpcgansmodel"
+version = "0.1.0"
+description = "Docker container for dpcgans model"
+authors = [
+    {name = "Your Name",email = "you@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "sdv (==1.6.0)",
+    "rdt (==1.9.0)",
+    "dp-cgans (>=0.0.6,<0.0.7)",
+    "setuptools (>=80.9.0,<81.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

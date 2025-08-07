@@ -1,0 +1,86 @@
+# this 'production' docker compose does not expose internal service ports to the host machine
+# docker-compose.override.yaml does, and is included by default in docker-compose commands
+
+services:
+
+
+  vueapp:
+    build: ./vueapp
+    depends_on:
+      - router
+
+  router:
+    build: ./router
+    ports:
+      - "8000:8000"
+    depends_on:
+      - stat_server_py
+      #- stat_server_r
+      - hapi
+      - synthea_server
+      - model_server
+
+
+  stat_server_py:
+    build: ./stat_server_py
+    depends_on:
+      - hapi
+
+
+  stat_server_r:
+    build: ./stat_server_r
+    depends_on:
+      - hapi
+
+
+  hapi:
+    container_name: hapi
+    image: "hapiproject/hapi:latest"
+    ports:
+      - "8080:8080"
+    configs:
+      - source: hapi
+        target: /app/config/application.yaml
+    depends_on:
+      - hapi_db
+
+
+  hapi_db:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: admin
+      POSTGRES_USER: admin
+      POSTGRES_DB: hapi
+    volumes:
+      - ./hapi/postgres_data:/var/lib/postgresql/data
+
+
+  synthea_server:
+    depends_on:
+      - hapi
+    build: ./synthea_server
+
+
+  model_server:
+    depends_on:
+      - model_server_db
+    build: ./model_server
+    volumes:
+      - shared_tmp:/shared-tmp
+      - /var/run/docker.sock:/var/run/docker.sock
+
+
+  model_server_db:
+    image: mongo:6
+    restart: always
+
+
+configs:
+  hapi:
+    file: ./hapi/hapi.application.yaml
+
+
+# shared_tmp is used by the model server to share files with spun-up model containers; do not remove
+volumes:
+  shared_tmp:
