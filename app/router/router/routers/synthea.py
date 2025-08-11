@@ -1,5 +1,5 @@
-from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, HTTPException, Query, Path
+from fastapi.responses import JSONResponse, StreamingResponse
 import httpx
 import logging
 
@@ -16,7 +16,11 @@ router = APIRouter(
 async def get_synthetic_patients(
     num_patients: int = Query(10, ge=1, le=5000),
     num_years: int = Query(1, ge=1, le=100),
-    cohort_id: str = Query(None)
+    cohort_id: str = Query(None),
+    exporter: str = Query("fhir", description="Export format, either 'csv' or 'fhir'"),
+    min_age: int = Query(0, ge=0, le=140, description="Minimum age of generated patients"),
+    max_age: int = Query(140, ge=0, le=140, description="Maximum age of generated patients"),
+    gender: str = Query("both", description="Gender of generated patients ('both', 'male', or 'female')")
 ):
     # Validate cohort_id if provided by the user
     if cohort_id and '_' in cohort_id:
@@ -50,6 +54,10 @@ async def get_synthetic_patients(
         "num_patients": num_patients,
         "num_years": num_years,
         "cohort_id": cohort_id,
+        "exporter": exporter,
+        "min_age": min_age,
+        "max_age": max_age,
+        "gender": gender
     }
     try:
         # Dynamic timeout based on patient count and years
@@ -225,8 +233,7 @@ async def generate_download_synthetic_patients(
     exporter: str = Query("fhir", description="Export format, either 'csv' or 'fhir'"),
     min_age: int = Query(0, ge=0, le=140),
     max_age: int = Query(140, ge=0, le=140),
-    gender: str = Query("both", description="Gender of generated patients ('both', 'male', or 'female')"),
-    state: str = Query(None, description="Optional US state abbreviation to generate patients from")
+    gender: str = Query("both", description="Gender of generated patients ('both', 'male', or 'female')")
 ):
     """
     Generate synthetic patients and download them as a zip file.
@@ -244,8 +251,7 @@ async def generate_download_synthetic_patients(
         "gender": gender
     }
     
-    if state:
-        data["state"] = state
+
     
     try:
         # Dynamic timeout based on patient count and years

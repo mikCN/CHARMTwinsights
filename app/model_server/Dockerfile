@@ -9,10 +9,11 @@ RUN apt-get update && apt-get install -y \
     file \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry.
-ENV POETRY_VERSION=2.0.1
-RUN curl -sSL https://install.python-poetry.org | python3 - --version $POETRY_VERSION
-ENV PATH="/root/.local/bin:${PATH}"
+# Install Poetry directly with pip
+RUN pip install poetry==2.0.1
+
+# Verify Poetry installation
+RUN poetry --version
 
 # Set the working directory.
 WORKDIR /app
