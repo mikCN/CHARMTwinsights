@@ -10,7 +10,7 @@ from fastapi import FastAPI, HTTPException, Body
 from pydantic import BaseModel
 import docker
 from pymongo import MongoClient
-from typing import List, Any
+from typing import List, Any, Optional
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -36,8 +36,8 @@ class RegisterRequest(BaseModel):
     title: str
     short_description: str
     authors: str
-    examples: List[Any]
-    readme: str
+    examples: Optional[List[Any]] = None  # Optional - can be extracted from container
+    readme: Optional[str] = None  # Optional - can be extracted from container
 
 def wait_for_mongodb():
     """Wait for MongoDB to be ready"""
@@ -185,6 +185,72 @@ def _run_model_container(image: str, input_data: any) -> dict:
             if os.path.exists(temp_file):
                 os.remove(temp_file)
 
+def _extract_container_metadata(image: str) -> dict:
+    """Extract readme and examples from container files"""
+    temp_readme_path = None
+    temp_examples_path = None
+    metadata = {}
+    
+    try:
+        logger.info(f"Attempting to extract metadata from container: {image}")
+        
+        # Create unique temp files for this extraction
+        session_id = uuid.uuid4().hex
+        temp_readme_path = os.path.join("/shared-tmp", f"readme_{session_id}.md")
+        temp_examples_path = os.path.join("/shared-tmp", f"examples_{session_id}.json")
+        
+        # Try to copy README.md from container
+        try:
+            client.containers.run(
+                image,
+                command=["cp", "/app/README.md", f"/shared-tmp/readme_{session_id}.md"],
+                volumes={
+                    "app_shared_tmp": {"bind": "/shared-tmp", "mode": "rw"}
+                },
+                remove=True,
+                detach=False
+            )
+            
+            if os.path.exists(temp_readme_path):
+                with open(temp_readme_path, 'r') as f:
+                    metadata['readme'] = f.read()
+                logger.info(f"Extracted README from container: {image}")
+            
+        except Exception as e:
+            logger.debug(f"No README.md found in container {image}: {e}")
+        
+        # Try to copy examples.json from container
+        try:
+            client.containers.run(
+                image,
+                command=["cp", "/app/examples.json", f"/shared-tmp/examples_{session_id}.json"],
+                volumes={
+                    "app_shared_tmp": {"bind": "/shared-tmp", "mode": "rw"}
+                },
+                remove=True,
+                detach=False
+            )
+            
+            if os.path.exists(temp_examples_path):
+                with open(temp_examples_path, 'r') as f:
+                    examples_data = json.load(f)
+                metadata['examples'] = examples_data
+                logger.info(f"Extracted examples from container: {image}")
+            
+        except Exception as e:
+            logger.debug(f"No examples.json found in container {image}: {e}")
+        
+        return metadata
+        
+    except Exception as e:
+        logger.warning(f"Failed to extract metadata from container {image}: {e}")
+        return {}
+    finally:
+        # Clean up temporary files
+        for temp_file in [temp_readme_path, temp_examples_path]:
+            if temp_file and os.path.exists(temp_file):
+                os.remove(temp_file)
+
 def _register_model_internal(metadata: dict) -> dict:
     """Internal model registration function that can be called during startup"""
     image = metadata["image"]
@@ -258,7 +324,32 @@ def load_builtin_models():
         try:
             logger.info(f"Loading metadata for model: {model_name}")
             with open(metadata_file, 'r') as f:
-                metadata = json.load(f)
+                base_metadata = json.load(f)
+            
+            # Extract container metadata if available
+            image = base_metadata["image"]
+            container_metadata = _extract_container_metadata(image)
+            
+            # Merge metadata with container fallback
+            metadata = {
+                "image": base_metadata["image"],
+                "title": base_metadata["title"],
+                "short_description": base_metadata["short_description"],
+                "authors": base_metadata["authors"],
+                "examples": base_metadata.get("examples") or container_metadata.get("examples"),
+                "readme": base_metadata.get("readme") or container_metadata.get("readme")
+            }
+            
+            # Validate required fields
+            if not metadata["examples"]:
+                logger.error(f"No examples found for {model_name} in JSON file or container")
+                failed_count += 1
+                continue
+            
+            if not metadata["readme"]:
+                logger.error(f"No README found for {model_name} in JSON file or container")
+                failed_count += 1
+                continue
             
             # Register the model
             _register_model_internal(metadata)
@@ -314,25 +405,43 @@ def health_check():
 
 @app.post("/models")
 def register_model(req: RegisterRequest):
-    """Register a model via API"""
+    """Register a model via API with container metadata fallback"""
     try:
-        # Convert request to metadata dict
-        metadata = {
-            "image": req.image,
-            "title": req.title,
-            "short_description": req.short_description,
-            "authors": req.authors,
-            "examples": req.examples,
-            "readme": req.readme
-        }
-        
         # Try to pull image if not available locally
         try:
             client.images.pull(req.image)
         except Exception:
             pass  # Image might already be local
         
+        # Extract metadata from container if available
+        container_metadata = _extract_container_metadata(req.image)
+        
+        # Build final metadata with API override priority
+        metadata = {
+            "image": req.image,
+            "title": req.title,
+            "short_description": req.short_description,
+            "authors": req.authors,
+            "examples": req.examples if req.examples is not None else container_metadata.get("examples"),
+            "readme": req.readme if req.readme is not None else container_metadata.get("readme")
+        }
+        
+        # Validate that required fields are present
+        if metadata["examples"] is None:
+            raise HTTPException(
+                status_code=400, 
+                detail="Examples are required. Provide via API 'examples' field or include /app/examples.json in container."
+            )
+        
+        if metadata["readme"] is None:
+            raise HTTPException(
+                status_code=400, 
+                detail="README is required. Provide via API 'readme' field or include /app/README.md in container."
+            )
+        
         return _register_model_internal(metadata)
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions as-is
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Registration failed: {e}")
 
