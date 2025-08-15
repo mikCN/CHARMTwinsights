@@ -1,0 +1,5 @@
+#!/bin/bash
+# CHARMTwinsights Model Execution Script
+# DO NOT MODIFY - This script is called by the model server
+
+poetry run python predict.py "$@"

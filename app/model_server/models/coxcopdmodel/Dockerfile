@@ -35,6 +35,10 @@ COPY twinsight_model twinsight_model
 COPY predict.py ./
 COPY predict ./
 
+# Copy metadata files for container-based registration
+COPY README.md ./
+COPY examples.json ./
+
 # Make the 'predict' shell script executable
 RUN chmod +x predict
 

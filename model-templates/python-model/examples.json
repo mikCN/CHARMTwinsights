@@ -1,0 +1,14 @@
+[
+  {
+    "feature1": 1.0,
+    "feature2": "category_a",
+    "feature3": 42.5,
+    "id": "test_1"
+  },
+  {
+    "feature1": 2.0,
+    "feature2": "category_b", 
+    "feature3": 38.2,
+    "id": "test_2"
+  }
+]

@@ -14,11 +14,14 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - stat_server_py
-      #- stat_server_r
-      - hapi
-      - synthea_server
-      - model_server
+      stat_server_py:
+        condition: service_started
+      hapi:
+        condition: service_started
+      synthea_server:
+        condition: service_started
+      model_server:
+        condition: service_healthy
 
 
   stat_server_py:
@@ -64,11 +67,18 @@ services:
 
   model_server:
     depends_on:
-      - model_server_db
+      model_server_db:
+        condition: service_started
     build: ./model_server
     volumes:
       - shared_tmp:/shared-tmp
       - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
 
   model_server_db:

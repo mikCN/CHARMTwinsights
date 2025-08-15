@@ -1,51 +1,53 @@
 # Cox PH Model for COPD Prediction
 
-**Author:** Lakshmi Anandan  
-**Description:** A survival model to predict risk and survival probability for COPD based on demographics and comorbidities.  
-**Framework:** `lifelines`, `scikit-learn`  
+This model implements a Cox Proportional Hazards model using lifelines for survival analysis of COPD. It predicts partial hazard scores and survival probabilities at 5 years based on a set of demographic and comorbidity features.
 
-## Details
+## Features
 
-This model implements a Cox Proportional Hazards (CoxPH) model using `lifelines` for survival analysis of Chronic Obstructive Pulmonary Disease (COPD). It was trained on the All of Us Research Program data and is designed to predict an individual's relative risk score and their probability of remaining free from a COPD event over a specific time horizon. The model's inputs are based on a set of demographic, comorbidity, and behavioral features defined by concepts.
+- **ethnicity**: Patient ethnicity
+- **sex_at_birth**: Biological sex at birth  
+- **obesity**: Binary indicator for obesity (0/1)
+- **diabetes**: Binary indicator for diabetes (0/1)
+- **cardiovascular_disease**: Binary indicator for cardiovascular disease (0/1)
+- **smoking_status**: Smoking status (0.0 = Never, 1.0 = Current/Former)
+- **alcohol_use**: Binary indicator for alcohol use (0/1)
+- **bmi**: Body Mass Index
+- **age_at_time_0**: Age at baseline
 
-## Input Features Expected
+## Output
 
-The model expects a JSON-formatted array of inputs, where each object in the array represents a single patient record. The keys and their potential values are as follows:
+- **partial_hazard**: Relative risk compared to baseline
+- **survival_probability_5_years**: Probability of survival at 5 years
 
-* `ethnicity` (Categorical): One of `Not Hispanic or Latino`, `PMI: Prefer Not To Answer`, `PMI: Skip`, `What Race Ethnicity: Race Ethnicity None Of These`
-* `sex_at_birth` (Categorical): One of `Male`, `Female`, `I prefer not to answer`, `No matching concept`, `None`, `PMI: Skip`
-* `obesity` (Binary)
-* `diabetes` (Binary)
-* `cardiovascular_disease` (Binary)
-* `smoking_status` (Binary)
-* `alcohol_use` (Binary)
-* `bmi` (Continuous)
-* `age_at_time_0` (Continuous)
+## Model Details
 
-## Example Input
+Trained using Cox Proportional Hazards regression with lifelines library. Features are preprocessed using sklearn pipelines with imputation and standardization.
+
+## Usage
+
+The model accepts both single records and arrays of records. Each record should contain all the required features listed above.
+
+## Example
 
 ```json
-[
-  {
-    "ethnicity": "Not Hispanic or Latino",
-    "sex_at_birth": "Male",
-    "obesity": 1.0,
-    "diabetes": 0.0,
-    "cardiovascular_disease": 1.0,
-    "smoking_status": 0.0,
-    "alcohol_use": 0.0,
-    "bmi": 28.5,
-    "age_at_time_0": 65.0
-  },
-  {
-    "ethnicity": "Hispanic or Latino",
-    "sex_at_birth": "Female",
-    "obesity": 0.0,
-    "diabetes": 1.0,
-    "cardiovascular_disease": 0.0,
-    "smoking_status": 0.0,
-    "alcohol_use": 1.0,
-    "bmi": 32.1,
-    "age_at_time_0": 72.0
-  }
-]
+{
+  "ethnicity": "Not Hispanic or Latino", 
+  "sex_at_birth": "Female", 
+  "obesity": 0.0, 
+  "diabetes": 0.0, 
+  "cardiovascular_disease": 0.0, 
+  "smoking_status": 0.0, 
+  "alcohol_use": 0.0, 
+  "bmi": 25.0, 
+  "age_at_time_0": 50.0
+}
+```
+
+## Output Format
+
+```json
+{
+  "partial_hazard": 0.866,
+  "survival_probability_5_years": 0.963
+}
+```
