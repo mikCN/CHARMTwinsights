@@ -14,10 +14,11 @@
     - [4. Test Analytics](#4-test-analytics)
     - [5. Stopping and Cleaning Up](#5-stopping-and-cleaning-up)
 4. [Troubleshooting](#troubleshooting)
-5. [Development](#development)
+5. [Model Development](#model-development)
+6. [Development](#development)
     - [Recommendations](#recommendations)
     - [Iterating](#iterating)
-6. [Miscellaneous](#miscellaneous)
+7. [Miscellaneous](#miscellaneous)
 
 ## Overview
 
@@ -160,6 +161,64 @@ Having Docker issues? See [DOCKER_TIPS.md](DOCKER_TIPS.md) for detailed troubles
 - **Build errors:** Try `./build_all.sh --no-cache`
 - **Still broken:** `docker compose down && ./build_all.sh && docker compose up --detach`
 
+## Model Development
+
+CHARMTwinsights provides templates and tools to help developers create new machine learning models without needing Docker expertise.
+
+### Quick Start for Model Developers
+
+1. **Choose a template:**
+   ```bash
+   # For Python models
+   cp -r model-templates/python-model my-new-model
+   
+   # For R models  
+   cp -r model-templates/r-model my-new-model
+   ```
+
+2. **Customize your model:**
+   - Edit `predict.py` or `predict.R` with your model logic
+   - Update `README.md` with model documentation
+   - Update `examples.json` with test data
+   - Add dependencies to `pyproject.toml` or `DESCRIPTION`
+
+3. **Validate and build:**
+   ```bash
+   # Validate Dockerfile (prevents common mistakes)
+   python model-templates/validate-dockerfile.py my-new-model/Dockerfile
+   
+   # Build Docker image
+   docker build -t my-new-model:latest my-new-model/
+   ```
+
+4. **Register with CHARMTwinsights:**
+   ```bash
+   curl -X POST http://localhost:8000/modeling/models \
+     -H "Content-Type: application/json" \
+     -d '{
+       "image": "my-new-model:latest",
+       "title": "My New Model",
+       "short_description": "What your model does",
+       "authors": "Your Name"
+     }'
+   ```
+
+### Key Features for Model Developers
+
+- **Templates:** Ready-to-use Python and R model templates
+- **Container-based metadata:** Include `README.md` and `examples.json` in your model container
+- **Validation tools:** Prevent common Docker mistakes with automated validation
+- **File-based I/O:** Models read JSON input files and write JSON output files
+- **Example models:** Working examples to learn from
+
+### Resources
+
+- **Full guide:** [`model-templates/README.md`](model-templates/README.md)
+- **Python template:** [`model-templates/python-model/`](model-templates/python-model/)
+- **R template:** [`model-templates/r-model/`](model-templates/r-model/)
+- **Working example:** [`model-templates/examples/simple-classifier/`](model-templates/examples/simple-classifier/)
+- **Dockerfile validator:** [`model-templates/validate-dockerfile.py`](model-templates/validate-dockerfile.py)
+
 ## Development
 
 ### Recommendations
@@ -210,6 +269,7 @@ A common development loop is thus simply `docker compose build --with-dependenci
 
 ### Additional Documentation
 - [`DOCKER_TIPS.md`](DOCKER_TIPS.md): Comprehensive Docker troubleshooting guide for beginners
+- [`model-templates/`](model-templates/): Templates and guides for developing new models
 
 ### Useful Scripts
 The `scripts` folder contains a few useful scripts:

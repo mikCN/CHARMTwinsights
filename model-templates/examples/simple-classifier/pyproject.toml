@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "simple-classifier"
+version = "0.1.0"
+description = "Simple classifier example for CHARMTwinsights"
+authors = ["CHARMTwinsights Team <team@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+scikit-learn = "^1.3.0"
+pandas = "^2.0.0"
+numpy = "^1.24.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
