@@ -55,6 +55,136 @@ def wait_for_mongodb():
                 logger.error(f"Failed to connect to MongoDB after {max_retries} attempts: {e}")
                 raise
 
+def _run_model_container(image: str, input_data: any) -> dict:
+    """Run a model container with file-based I/O and capture stdout/stderr"""
+    session_id = uuid.uuid4().hex
+    input_file = f"input_{session_id}.json"
+    output_file = f"output_{session_id}.json"
+    
+    input_path = os.path.join("/shared-tmp", input_file)
+    output_path = os.path.join("/shared-tmp", output_file)
+    
+    try:
+        # Write input data to file
+        with open(input_path, "w") as f:
+            json.dump(input_data, f)
+            f.flush()
+
+        # Run the model container with both input and output file paths
+        logger.info(f"Running model {image} with file-based I/O...")
+        
+        # First try the new file-based I/O pattern
+        try:
+            container_result = client.containers.run(
+                image,
+                command=["./predict", f"/shared-tmp/{input_file}", f"/shared-tmp/{output_file}"],
+                volumes={
+                    "app_shared_tmp": {"bind": "/shared-tmp", "mode": "rw"}
+                },
+                remove=True,
+                stdout=True,
+                stderr=True,
+                detach=False
+            )
+            
+            # Check if output file was created (new pattern worked)
+            if os.path.exists(output_path):
+                logger.info(f"Model {image} uses new file-based I/O pattern")
+                new_pattern_used = True
+            else:
+                raise Exception("Model did not create output file - falling back to legacy pattern")
+                
+        except Exception as e:
+            logger.warning(f"New I/O pattern failed for {image}, trying legacy pattern: {e}")
+            new_pattern_used = False
+            
+            # Fallback to old stdout-based pattern
+            container_result = client.containers.run(
+                image,
+                command=["./predict", f"/shared-tmp/{input_file}"],
+                volumes={
+                    "app_shared_tmp": {"bind": "/shared-tmp", "mode": "rw"}
+                },
+                remove=True,
+                stdout=True,
+                stderr=True,
+                detach=False
+            )
+            
+            # Parse predictions from stdout (legacy pattern)
+            try:
+                stdout_output = container_result.decode('utf-8') if container_result else ""
+                predictions = json.loads(stdout_output.strip())
+                
+                # Create output file for consistency
+                with open(output_path, 'w') as f:
+                    json.dump(predictions, f)
+                    
+                logger.info(f"Model {image} uses legacy stdout pattern - converted to file-based")
+            except json.JSONDecodeError as json_err:
+                raise Exception(f"Legacy pattern failed - stdout is not valid JSON: {json_err}")
+        
+        # Capture and parse stdout/stderr from container result
+        raw_output = container_result.decode('utf-8') if container_result else ""
+        
+        # Try to split stdout/stderr based on simple heuristics
+        # In new pattern, models should send informational messages to stderr
+        # and only results to stdout
+        lines = raw_output.split('\n')
+        stdout_lines = []
+        stderr_lines = []
+        
+        for line in lines:
+            line = line.strip()
+            if not line:  # Skip empty lines
+                continue
+                
+            # Simple heuristic: lines with certain patterns go to stderr
+            stderr_indicators = [
+                'Loading', 'Processing', 'Generated', 'written to', 'Error:', 'Warning:',
+                'Model loaded', 'Completed processing', 'records', 'Starting', 'Successfully generated'
+            ]
+            
+            if any(phrase in line for phrase in stderr_indicators):
+                stderr_lines.append(line)
+            else:
+                stdout_lines.append(line)
+        
+        stdout_output = '\n'.join(stdout_lines).strip()
+        stderr_output = '\n'.join(stderr_lines).strip()
+
+        # Read predictions from output file
+        if not os.path.exists(output_path):
+            raise Exception(f"Model did not create output file: {output_file}")
+        
+        with open(output_path, 'r') as f:
+            predictions = json.load(f)
+        
+        logger.info(f"Model {image} execution successful")
+        
+        return {
+            "predictions": predictions,
+            "stdout": stdout_output,
+            "stderr": stderr_output,
+            "model_logs": {
+                "input_file": input_file,
+                "output_file": output_file,
+                "session_id": session_id
+            }
+        }
+        
+    except json.JSONDecodeError as e:
+        raise Exception(f"Model output file contains invalid JSON: {e}")
+    except Exception as e:
+        # If output file doesn't exist, try to get any error info from stdout
+        error_info = container_result.decode('utf-8') if 'container_result' in locals() else "No output"
+        raise Exception(f"Model execution failed: {e}. Container output: {error_info}")
+    finally:
+        # Clean up temporary files
+        for temp_file in [input_path, output_path]:
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+
 def _register_model_internal(metadata: dict) -> dict:
     """Internal model registration function that can be called during startup"""
     image = metadata["image"]
@@ -67,33 +197,17 @@ def _register_model_internal(metadata: dict) -> dict:
         logger.error(f"Image not found locally: {image} - {e}")
         raise Exception(f"Image not found locally: {image}")
 
-    temp_json_path = None
     try:
-        # Write provided examples to /shared-tmp as a temp file
-        temp_json_path = os.path.join("/shared-tmp", f"examples_{uuid.uuid4().hex}.json")
-        with open(temp_json_path, "w") as tf:
-            json.dump(metadata["examples"], tf)
-            tf.flush()
-
-        # Try running prediction using the provided examples as test input
+        # Test the model with provided examples
         logger.info(f"Testing model {image} with examples...")
-        output = client.containers.run(
-            image,
-            command=["./predict", f"/shared-tmp/{os.path.basename(temp_json_path)}"],
-            volumes={
-                "app_shared_tmp": {"bind": "/shared-tmp", "mode": "rw"}
-            },
-            remove=True,
-            stdout=True,
-            stderr=False
-        )
-
-        try:
-            preds = json.loads(output.decode())
-            logger.info(f"Model {image} test successful")
-        except Exception as e:
-            logger.error(f"Model {image} prediction did not return valid JSON: {e}. Output was: {output.decode()}")
-            raise Exception(f"Prediction did not return valid JSON: {e}")
+        result = _run_model_container(image, metadata["examples"])
+        
+        preds = result["predictions"]
+        logger.info(f"Model {image} test successful")
+        
+        # Log any stderr output during registration
+        if result["stderr"]:
+            logger.info(f"Model {image} stderr during registration: {result['stderr']}")
 
         # Store in MongoDB
         doc = {
@@ -108,13 +222,18 @@ def _register_model_internal(metadata: dict) -> dict:
         models_collection.replace_one({"image": image}, doc, upsert=True)
         logger.info(f"Successfully registered model: {image}")
 
-        return {"status": "ok", "image": image, "example_predictions": preds}
+        return {
+            "status": "ok", 
+            "image": image, 
+            "example_predictions": preds,
+            "registration_logs": {
+                "stdout": result["stdout"],
+                "stderr": result["stderr"]
+            }
+        }
     except Exception as e:
         logger.error(f"Registration failed for {image}: {e}")
         raise
-    finally:
-        if temp_json_path and os.path.exists(temp_json_path):
-            os.remove(temp_json_path)
 
 def load_builtin_models():
     """Load and register built-in models from metadata files"""
@@ -222,37 +341,22 @@ def predict(
     image: str = Body(..., embed=True),
     input: List[Any] = Body(..., embed=True)
 ):
+    """Make a prediction using a registered model with file-based I/O"""
     # 1. Confirm the model is registered
     m = models_collection.find_one({"image": image})
     if not m:
         raise HTTPException(status_code=404, detail="Model not registered")
 
-    # 2. Write input to /shared-tmp as a temp file
-    temp_filename = f"input_{uuid.uuid4().hex}.json"
-    temp_path = os.path.join("/shared-tmp", temp_filename)
-    with open(temp_path, "w") as f:
-        json.dump(input, f)
-        f.flush()
-
-    # 3. Run the model container to generate prediction
+    # 2. Run the model with file-based I/O
     try:
-        output = client.containers.run(
-            image,
-            command=["./predict", f"/shared-tmp/{temp_filename}"],
-            volumes={
-                "app_shared_tmp": {"bind": "/shared-tmp", "mode": "rw"}
-            },
-            remove=True,
-            stdout=True,
-            stderr=False
-        )
-        preds = json.loads(output.decode())
-        return {"predictions": preds}
+        result = _run_model_container(image, input)
+        return {
+            "predictions": result["predictions"],
+            "stdout": result["stdout"],
+            "stderr": result["stderr"]
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Prediction failed: {e}. Output was: {output.decode() if output else 'No output'}")
-    finally:
-        if temp_path and os.path.exists(temp_path):
-            os.remove(temp_path)
+        raise HTTPException(status_code=500, detail=f"Prediction failed: {e}")
 
 @app.get("/models")
 def list_models():

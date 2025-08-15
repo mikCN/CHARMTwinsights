@@ -7,6 +7,10 @@ import pickle
 from lifelines import CoxPHFitter
 from sklearn.compose import ColumnTransformer # Keep if your preprocessor uses ColumnTransformer explicitly
 
+# Suppress warnings for cleaner output in default models
+import warnings
+warnings.filterwarnings('ignore')
+
 
 # --- CONFIGURE THESE PATHS ---
 # ADJUST THESE FILENAMES AND PATHS TO MATCH YOUR EXACT .PKL FILES AND THEIR LOCATION!
@@ -104,25 +108,33 @@ def get_prediction_for_single_record(record_dict: dict) -> dict:
 
 
 def main():
-    # Adheres to the original script's command-line interface: predict.py <input.json>
-    if len(sys.argv) != 2:
-        print("Usage: predict.py <input.json>", file=sys.stderr)
+    # Updated to support both legacy and new file-based I/O patterns
+    if len(sys.argv) not in [2, 3]:
+        print("Usage: predict.py <input.json> [output.json]", file=sys.stderr)
         sys.exit(1)
     
     input_file_path = sys.argv[1]
+    output_file_path = sys.argv[2] if len(sys.argv) == 3 else None
+
+    print("Starting COPD Cox PH model prediction...", file=sys.stderr)
 
     # Load input records from the JSON file
     try:
         with open(input_file_path, 'r') as f:
             X_raw_records = json.load(f) 
         
+        print(f"Loaded input data from {input_file_path}", file=sys.stderr)
+        
         # --- IMPROVED INPUT HANDLING ---
         # If input is a single dictionary, wrap it in a list for consistent processing
         if isinstance(X_raw_records, dict):
             X_raw_records = [X_raw_records]
+            print("Single record input - converted to list", file=sys.stderr)
         # Ensure X_raw_records is indeed a list of dictionaries
         elif not isinstance(X_raw_records, list) or not all(isinstance(item, dict) for item in X_raw_records):
             raise ValueError("Input JSON must be a dictionary or a list of dictionaries.")
+
+        print(f"Processing {len(X_raw_records)} records", file=sys.stderr)
 
     except FileNotFoundError:
         print(f"Error: Input file not found at {input_file_path}", file=sys.stderr)
@@ -139,8 +151,9 @@ def main():
 
     res = [] # List to accumulate results for each record
     # Iterate over each record in the input list, process it, and append its result
-    for x_record_dict in X_raw_records:
+    for i, x_record_dict in enumerate(X_raw_records):
         try:
+            print(f"Processing record {i+1}/{len(X_raw_records)}", file=sys.stderr)
             yhat_record = get_prediction_for_single_record(x_record_dict)
             res.append(yhat_record) # Append the dictionary result for the current record
             
@@ -150,9 +163,21 @@ def main():
             print(f"Warning: Error processing record {x_record_dict.get('person_id', 'unknown')}: {e}", file=sys.stderr)
             res.append({"error": str(e), "original_input": x_record_dict})
 
+    print(f"Completed processing all records. Generated {len(res)} results.", file=sys.stderr)
 
-    # Print the final JSON output to stdout
-    print(json.dumps(res, indent=2)) # Use indent=2 for readable output
+    # Output results
+    if output_file_path:
+        # New file-based I/O pattern
+        try:
+            with open(output_file_path, 'w') as f:
+                json.dump(res, f, indent=2)
+            print(f"Results written to {output_file_path}")
+        except Exception as e:
+            print(f"Error writing output file: {e}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        # Legacy stdout pattern for backwards compatibility
+        print(json.dumps(res, indent=2))
         
 if __name__ == "__main__":
     main()
