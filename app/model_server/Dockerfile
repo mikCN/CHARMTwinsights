@@ -9,10 +9,11 @@ RUN apt-get update && apt-get install -y \
     file \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry.
-ENV POETRY_VERSION=2.0.1
-RUN curl -sSL https://install.python-poetry.org | python3 - --version $POETRY_VERSION
-ENV PATH="/root/.local/bin:${PATH}"
+# Install Poetry directly with pip
+RUN pip install poetry==2.0.1
+
+# Verify Poetry installation
+RUN poetry --version
 
 # Set the working directory.
 WORKDIR /app
@@ -23,8 +24,11 @@ COPY pyproject.toml ./
 # install just the dependencies to start
 RUN poetry install --no-interaction --no-ansi --only main --no-root
 
-# then copy the main package - WHY IS THIS NOT WORKGINGGGGG
+# then copy the main package
 COPY model_server ./model_server
+
+# Copy built-in model metadata maintaining directory structure
+COPY models/ /app/builtin_models/
 
 # then install the main package for use
 RUN poetry install --no-interaction --no-ansi

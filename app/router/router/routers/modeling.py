@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Body
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from typing import List, Any
+from typing import List, Any, Optional
 import httpx
 import logging
 
@@ -21,8 +21,8 @@ class RegisterRequest(BaseModel):
     title: str
     short_description: str
     authors: str
-    examples: List[Any]
-    readme: str
+    examples: Optional[List[Any]] = None
+    readme: Optional[str] = None
 
 class PredictRequest(BaseModel):
     image: str

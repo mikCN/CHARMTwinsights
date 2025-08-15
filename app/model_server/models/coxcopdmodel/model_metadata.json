@@ -1,0 +1,6 @@
+{
+  "image": "coxcopdmodel:latest",
+  "title": "Cox PH Model for COPD Prediction",
+  "short_description": "A survival model to predict risk and survival probability for COPD based on demographics and comorbidities.",
+  "authors": "Lakshmi Anandan"
+}

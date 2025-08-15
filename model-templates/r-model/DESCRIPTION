@@ -1,0 +1,16 @@
+Package: my-r-model
+Title: My CHARMTwinsights R Model
+Version: 0.1.0
+Author: Your Name <your.email@example.com>
+Maintainer: Your Name <your.email@example.com>
+Description: My R model for CHARMTwinsights
+Depends: R (>= 4.0.0)
+Imports: 
+    jsonlite,
+    readr
+Suggests:
+    randomForest,
+    caret,
+    e1071,
+    glmnet,
+    rpart

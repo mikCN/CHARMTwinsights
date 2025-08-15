@@ -24,7 +24,7 @@ curl -X POST http://localhost:$APP_PORT/modeling/predict \
         "obesity": 0.0, 
         "diabetes": 0.0, 
         "cardiovascular_disease": 0.0, 
-        "smoking_status": "Never", 
+        "smoking_status": 0.0,
         "alcohol_use": 0.0, 
         "bmi": 25.0, 
         "age_at_time_0": 50.0
@@ -35,7 +35,7 @@ curl -X POST http://localhost:$APP_PORT/modeling/predict \
         "obesity": 1.0, 
         "diabetes": 1.0, 
         "cardiovascular_disease": 1.0, 
-        "smoking_status": "Current", 
+        "smoking_status": 1.0,
         "alcohol_use": 1.0, 
         "bmi": 32.0, 
         "age_at_time_0": 65.0
@@ -46,7 +46,7 @@ curl -X POST http://localhost:$APP_PORT/modeling/predict \
         "obesity": 0.0, 
         "diabetes": 0.0, 
         "cardiovascular_disease": 0.0, 
-        "smoking_status": "Never", 
+        "smoking_status": 0.0,
         "alcohol_use": 0.0, 
         "bmi": 28.0, 
         "age_at_time_0": 45.0
