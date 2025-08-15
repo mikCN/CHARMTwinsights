@@ -8,18 +8,16 @@
 2. [Architecture](#architecture)
 3. [Installation and Usage](#installation-and-usage)
     - [0. Prerequisites](#0-prerequisites)
-    - [1. Build Application Images](#1-build-application-images)
-    - [2. Build Model Images](#2-build-model-images)
-    - [3. Start App](#3-start-app)
-    - [4. Load Models](#4-load-models)
-    - [5. Generate Synthetic Data](#5-generate-synthetic-data)
-    - [6. Test Models](#6-test-predictive-models)
-    - [7. Test Analytics](#7-test-summary-statistics)
-    - [8. Cleaning up](#8-cleaning-up)
-4. [Development](#development)
+    - [1. Build and Start Application](#1-build-and-start-application)
+    - [2. Generate Synthetic Data](#2-generate-synthetic-data)
+    - [3. Test Models](#3-test-models)
+    - [4. Test Analytics](#4-test-analytics)
+    - [5. Stopping and Cleaning Up](#5-stopping-and-cleaning-up)
+4. [Troubleshooting](#troubleshooting)
+5. [Development](#development)
     - [Recommendations](#recommendations)
     - [Iterating](#iterating)
-5. [Miscellaneous](#miscellaneous)
+6. [Miscellaneous](#miscellaneous)
 
 ## Overview
 
@@ -66,55 +64,22 @@ You will need `docker`; if using a Mac install [Docker Desktop](https://www.dock
 - Mac users may also wish to install GNU versions of [coreutils](https://formulae.brew.sh/formula/coreutils)
 - **Mac users may also need to enable Docker volume storage under `System Preferences -> Privacy and Security -> Files and Folders -> Docker`**
 
-### 1. Build Application Images
+### 1. Build and Start Application
 
-First, build the images for the application with `docker compose`. All `docker compose` commands need to be run in the same directory as the `docker-compose.yml` file.
-
-```bash
-# working dir: app
-docker compose build
-```
-
-If you are having trouble, you might add a `--no-cache` to force rebuilding images from scratch, and/or a `--progress=plain` to see complete build progress and error logs.
-
-### 2. Build Model Images
-
-Next, build the default images for the model-hosting service. These default models may be complemented with other Docker-based models via the API, provided the referenced images are on the same host as the app, or available on Dockerhub or another container registry. You can skip this step if you don't intend to use the predefined models.
+**New simplified process:** CHARMTwinsights now automatically builds and registers all components in one step.
 
 ```bash
 # working dir: app
-model_server/models/build_model_images.sh
-```
-
-You can add build args to this script, e.g. `--no-cache` to force rebuilding the model images.
-
-### 3. Start App
-
-Using `docker compose`:
-
-```bash
-# working dir: app
+./build_all.sh
 docker compose up --detach
 ```
 
-This starts all services in the application in a 'detached' state; subsequent docker compose commands (e.g. `docker compose logs`, `docker compose down`) can be used for management. 
+The `build_all.sh` script builds both the application images and the built-in ML models. All `docker compose` commands need to be run in the same directory as the `docker-compose.yml` file.
 
-The main API endpoints will be browsable at [`http://localhost:8000/docs`](http://localhost:8000/docs).
-
-### 4. Load Models
-
-The default set of predictive and generative models must be registered with the model server before use. You can skip this step if you
-don't intend to use the predefined models.
-
-```bash
-# working dir: app
-model_server/models/register_model_images.sh
-```
-
-Each model will be tested with the example inputs, returning the generated results.
+The main API endpoints will be browsable at [`http://localhost:8000/docs`](http://localhost:8000/docs). All built-in models (IrisModel, CoxCOPDModel, DPCGANSModel) will be automatically available.
 
 
-### 5. Generate Synthetic Data
+### 2. Generate Synthetic Data
 
 Synthetic patient data in FHIR format may be generated via a POST request to http://localhost:8000/synthetic/synthea/generate-synthetic-patients, with url parameters `num_patients`, `num_years`, 
 and `cohort_id`. The patients will be simulated with Synthea, and their records will be tagged with the provided `cohort_id` (defaulting to `default`).
@@ -130,7 +95,7 @@ synthea_server/gen_patients.sh
 
 These data are pushed to the FHIR server accessible at `http://localhost:8080` for development purposes.
 
-### 6. Test Models
+### 3. Test Models
 
 Predictive model capabilities are accessed under endpoints at `http://localhost:8000/modeling`. Example CURLs are available via script:
 
@@ -141,7 +106,7 @@ model_server/models/test_predict_models.sh
 
 As above, skip if you are not developing or using models.
 
-### 7. Test Analytics
+### 4. Test Analytics
 
 Summary statistics about generated patient data are available under endpoints at `http://localhost:8000/stats`. Examples CURLs are available via script:
 
@@ -150,24 +115,50 @@ Summary statistics about generated patient data are available under endpoints at
 stat_server_py/test_stats.sh
 ```
 
-### 8. Cleaning up
+### 5. Stopping and Cleaning Up
 
-Use docker compose to stop the services and cleanup:
-
+#### Basic Stop
+To stop the application but keep generated/imported FHIR data:
 ```bash
 # working dir: app
 docker compose down
 ```
 
-Because generating and loading synthetic data into the FHIR server is time consuming, data for the backing Postgres 
-database **is persisted**. To remove this data, simply remove the files in `app/hapi/postgres_data/`:
+#### Full Reset
+To completely reset everything (useful if you encounter issues):
 
 ```bash
 # working dir: app
+# Stop all services
+docker compose down
+
+# Remove stored FHIR data (optional - this data takes time to regenerate)
 rm -rf hapi/postgres_data/*
+
+# For a completely fresh start, you can also remove model metadata
+# (models will be automatically re-registered on next startup)
+docker volume rm app_shared_tmp 2>/dev/null || true
 ```
 
-Other data are not persisted (e.g. model metadata loaded into the `model_server`), though any built model docker images will remain on your local machine unless removed via docker commands (or Docker Desktop).
+**Note:** The FHIR database data is persisted in `hapi/postgres_data/` to avoid having to regenerate synthetic patients every time. Model metadata is stored in MongoDB and will be automatically recreated when you restart.
+
+#### Nuclear Option (Use with Caution)
+If you're experiencing persistent Docker issues, you can use the cleanup script:
+```bash
+# working dir: project root
+scripts/docker_clean.sh
+```
+**WARNING:** This script removes ALL Docker containers and networks on your system, not just CHARMTwinsights!
+
+## Troubleshooting
+
+Having Docker issues? See [DOCKER_TIPS.md](DOCKER_TIPS.md) for detailed troubleshooting help.
+
+**Quick fixes:**
+- **Won't start:** Make sure Docker Desktop is running
+- **Port conflicts:** Run `docker compose down` first  
+- **Build errors:** Try `./build_all.sh --no-cache`
+- **Still broken:** `docker compose down && ./build_all.sh && docker compose up --detach`
 
 ## Development
 
@@ -202,12 +193,12 @@ After the application has been initialized and databases populated, a typical wo
 
 1. Rebuild relevant containers with `docker compose build --with-dependencies <service_name>`
 
-    - This should only rebuild services that have changed and that are dependent on the service; Dockerfiles have also been designed to maximize use of layer caching for fast rebuilds. If you run into trouble and think caching is or other persistent data are an issue, you can try these more forceful and time-consuming rebuilds:
+    - This should only rebuild services that have changed and that are dependent on the service; Dockerfiles have also been designed to maximize use of layer caching for fast rebuilds. If you run into trouble and think caching or persistent data are causing issues, try these approaches in order:
    
-      - `docker compose down --remove-orphans --volumes`
-      - `rm -rf hapi/postgres_data/*` (to remove HAPI data)
-      - `docker compose build --no-cache --progress=plain` (without a target and cache to force rebuild of all services, with plain logging for surfacing potential build errors)
-      - `docker compose up --force-recreate --with-dependencies --renew-anon-volumes --detach` (redeploy app)
+      1. **Simple rebuild:** `docker compose build <service_name> --no-cache`
+      2. **Reset service data:** `docker compose down && docker compose up --detach`  
+      3. **Full reset:** `docker compose down && rm -rf hapi/postgres_data/* && ./build_all.sh --no-cache && docker compose up --detach`
+      4. **Nuclear option:** Use `scripts/docker_clean.sh` (removes ALL Docker containers/networks on your system)
 
 1. Restart the services with `docker compose up <service_name>`.
 
@@ -217,6 +208,10 @@ A common development loop is thus simply `docker compose build --with-dependenci
 
 ## Miscellaneous
 
+### Additional Documentation
+- [`DOCKER_TIPS.md`](DOCKER_TIPS.md): Comprehensive Docker troubleshooting guide for beginners
+
+### Useful Scripts
 The `scripts` folder contains a few useful scripts:
 
 - `docker_status.sh`: list various running docker resources
